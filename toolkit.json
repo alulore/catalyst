@@ -20,5 +20,50 @@
   "agents": {
     "mcp": { "name": "catalyst", "args": ["mcp"] },
     "skills": ["skills/catalyst"]
+  },
+  "showcase": {
+    "tagline": "Typed API clients from your OpenAPI specs, and an MCP server so your agent reads the API instead of guessing it.",
+    "signal": "cyan",
+    "highlights": [
+      {
+        "title": "One config, every client",
+        "text": "`catalyst.config.json` lists your specs. `catalyst gen openapi` writes a typed TypeScript client for each, and `--check` fails CI when one drifts."
+      },
+      {
+        "title": "Answers from the spec",
+        "text": "`catalyst api show` prints how to call an endpoint: the signature, the parameters, the response and its types. Nobody reads the raw JSON."
+      },
+      {
+        "title": "One small binary",
+        "text": "A Native AOT build for Windows, with no .NET runtime to install. Toolkit puts it on your PATH and wires it into your agents."
+      }
+    ],
+    "mcpTools": [
+      { "name": "list_clients", "text": "The API clients in `catalyst.config.json`: name, spec source and output file." },
+      { "name": "list_operations", "text": "Every endpoint as the generated client exposes it, filtered by words, tag or method." },
+      { "name": "show_operation", "text": "How to call one endpoint: the exact signature, a parameter table, the response and its types." },
+      { "name": "show_type", "text": "The TypeScript declaration of one generated type, with the types it references." },
+      { "name": "diff_spec", "text": "Breaking and non-breaking changes between two versions of a spec, in terms of the generated client." },
+      { "name": "generate_clients", "text": "Writes the clients to their output files, or checks them without writing anything." }
+    ],
+    "demo": {
+      "frame": "agent",
+      "title": "An agent reads the API",
+      "steps": [
+        { "role": "prompt", "text": "Add a page that shows one pet by its id. Use the Petstore client." },
+        { "role": "call", "text": "catalyst.show_operation { operation: \"GET /pets/{petId}\", client: \"Petstore\" }" },
+        {
+          "role": "output",
+          "text": "GET /pets/{petId}\nGet one pet\n\nCall:\n  client.get.pet(petId: number, headers?: Record<string, string>, signal?: AbortSignal): Promise<ApiResult<Pet>>\n\nParameters:\n  NAME   WIRE   IN    REQUIRED  TYPE    DESCRIPTION\n  petId  petId  path  required  number\n\nResponse: Pet (application/json)\n\nTypes:\nexport interface Pet {\n    id: number;\n    name: string;\n    tag?: string;\n}"
+        },
+        {
+          "role": "reply",
+          "text": "`client.get.pet(petId)` returns an `ApiResult<Pet>`. I'll call it from the page, show the name, and show the tag only when the API sends one. First, a check that the client is current."
+        },
+        { "role": "call", "text": "catalyst.generate_clients { check: true }" },
+        { "role": "output", "text": "Petstore  upToDate  D:\\shop\\api\\Petstore.ts" },
+        { "role": "reply", "text": "The client matches the spec, so the page is built against the API as it is today." }
+      ]
+    }
   }
 }
