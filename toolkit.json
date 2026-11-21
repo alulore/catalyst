@@ -51,17 +51,17 @@
       "title": "An agent reads the API",
       "steps": [
         { "role": "prompt", "text": "Add a page that shows one pet by its id. Use the Petstore client." },
-        { "role": "call", "text": "catalyst.show_operation  GET /pets/{petId}" },
+        { "role": "call", "text": "catalyst.show_operation { operation: \"GET /pets/{petId}\", client: \"Petstore\" }" },
         {
           "role": "output",
-          "text": "GET /pets/{petId}\nGet one pet\n\nCall:\n  client.get.pet(petId: number): Promise<ApiResult<Pet>>\n\nParameters:\n  NAME   IN    REQUIRED  TYPE\n  petId  path  required  number\n\nResponse: Pet (application/json)\n\nexport interface Pet {\n    id: number;\n    name: string;\n    tag?: string;\n}"
+          "text": "GET /pets/{petId}\nGet one pet\n\nCall:\n  client.get.pet(petId: number, headers?: Record<string, string>, signal?: AbortSignal): Promise<ApiResult<Pet>>\n\nParameters:\n  NAME   WIRE   IN    REQUIRED  TYPE    DESCRIPTION\n  petId  petId  path  required  number\n\nResponse: Pet (application/json)\n\nTypes:\nexport interface Pet {\n    id: number;\n    name: string;\n    tag?: string;\n}"
         },
         {
           "role": "reply",
           "text": "`client.get.pet(petId)` returns an `ApiResult<Pet>`. I'll call it from the page, show the name, and show the tag only when the API sends one. First, a check that the client is current."
         },
-        { "role": "call", "text": "catalyst.generate_clients  check: true" },
-        { "role": "output", "text": "Up to date: D:\\shop\\api\\Petstore.ts\n1 client(s) up to date." },
+        { "role": "call", "text": "catalyst.generate_clients { check: true }" },
+        { "role": "output", "text": "Petstore  upToDate  D:\\shop\\api\\Petstore.ts" },
         { "role": "reply", "text": "The client matches the spec, so the page is built against the API as it is today." }
       ]
     }
