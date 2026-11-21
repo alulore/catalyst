@@ -1,6 +1,6 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Catalyst.Common.Serialization;
 using Auxil.Extensions;
 
 namespace Catalyst.Common.Services;
@@ -11,11 +11,6 @@ namespace Catalyst.Common.Services;
 /// </summary>
 internal static class TypeScriptNaming
 {
-    private static readonly JsonSerializerOptions StringLiteralOptions = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     private static readonly HashSet<string> ReservedWords =
     [
         "break", "case", "catch", "class", "const", "continue", "debugger", "default",
@@ -116,7 +111,7 @@ internal static class TypeScriptNaming
     /// <summary>Double-quoted literal with quotes, backslashes and control characters escaped.</summary>
     public static string StringLiteral(string value)
     {
-        return JsonSerializer.Serialize(value, StringLiteralOptions);
+        return JsonSerializer.Serialize(value, CatalystJson.Literal.String);
     }
 
     /// <summary>Single-quoted literal, the style used for the URLs in the generated factory.</summary>

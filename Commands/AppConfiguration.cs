@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Catalyst.Commands.Api;
 using Catalyst.Commands.Gen;
 using Catalyst.Commands.Mcp;
@@ -8,6 +9,29 @@ namespace Catalyst.Commands;
 /// <summary>The command tree of the CLI, shared by Program and the command tests.</summary>
 internal static class AppConfiguration
 {
+    /// <summary>
+    /// Registers the commands. Spectre.Console.Cli reads command and settings types by reflection (interfaces, constructors,
+    /// option properties) without trim annotations, so the dependencies below keep that metadata when the app is trimmed or
+    /// compiled ahead of time; the Spectre types are named by string because they are internal to 0.55.
+    /// </summary>
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(McpCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(McpCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiSettings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiListCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiListCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiShowCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiShowCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiDiffCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiDiffCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiSchemaCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(ApiSchemaCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(OpenApiCommand))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(OpenApiCommand.Settings))]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, "Spectre.Console.Cli.EmptyCommandSettings", "Spectre.Console.Cli")]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, "Spectre.Console.Cli.OpenCliGeneratorCommand", "Spectre.Console.Cli")]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, "Spectre.Console.Cli.ExplainCommand", "Spectre.Console.Cli")]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, "Spectre.Console.Cli.VersionCommand", "Spectre.Console.Cli")]
+    [DynamicDependency(DynamicallyAccessedMemberTypes.All, "Spectre.Console.Cli.XmlDocCommand", "Spectre.Console.Cli")]
     public static void Configure(IConfigurator config, string[] args, string version)
     {
         // Unknown options and stray arguments are errors, and every usage error exits with the same code.

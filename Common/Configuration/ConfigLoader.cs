@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Catalyst.Common.Serialization;
 
 namespace Catalyst.Common.Configuration;
 
@@ -11,7 +12,6 @@ internal sealed record ConfigLoadResult(CatalystConfig? Config, string? Path, st
 internal static class ConfigLoader
 {
     private static readonly string[] ConfigFileNames = ["catalyst.config.json", ".catalyst.config.json"];
-    private static readonly JsonSerializerOptions JsonSerializerOptions = new() { PropertyNameCaseInsensitive = true };
 
     public static CatalystConfig? Load()
     {
@@ -45,7 +45,7 @@ internal static class ConfigLoader
                 try
                 {
                     string content = File.ReadAllText(path);
-                    CatalystConfig? config = JsonSerializer.Deserialize<CatalystConfig>(content, JsonSerializerOptions);
+                    CatalystConfig? config = JsonSerializer.Deserialize(content, CatalystJson.Config.CatalystConfig);
 
                     return config is null
                         ? new ConfigLoadResult(null, path, $"The config is empty or not a JSON object: {path}")

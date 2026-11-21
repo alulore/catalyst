@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Catalyst.Commands.Gen;
 using Catalyst.Common.Models;
+using Catalyst.Common.Serialization;
 using Catalyst.Common.Services;
 
 namespace Catalyst.Commands.Api;
@@ -17,12 +18,6 @@ internal sealed record ApiListItem(string Method, string Path, string? Operation
 /// </summary>
 internal sealed class ApiReport
 {
-    /// <summary>Like the gen openapi options, but quotes in the TypeScript text stay readable instead of becoming ".</summary>
-    private static readonly JsonSerializerOptions JsonOptions = new(RunReport.JsonOptions)
-    {
-        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
-
     public int SchemaVersion => 1;
     public required string Command { get; init; }
     public bool Success { get; set; }
@@ -68,7 +63,7 @@ internal sealed class ApiReport
     }
 
     /// <summary>The JSON document of the --json output (and of the MCP structured content).</summary>
-    public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+    public string ToJson() => JsonSerializer.Serialize(this, CatalystJson.Api.ApiReport);
 
     /// <summary>The text the CLI prints, as one string; errors are included as "Error: ..." lines.</summary>
     public string ToText()

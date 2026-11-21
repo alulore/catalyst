@@ -5,14 +5,19 @@ specifications into dependency-free TypeScript clients.
 
 ## Install
 
-As a .NET tool from the GitHub Packages feed (`catalyst-cli`):
+Windows only. With toolkit:
 
-```bash
-dotnet tool install --global catalyst-cli --add-source https://nuget.pkg.github.com/alexpetrou94/index.json
+```powershell
+toolkit install catalyst
 ```
 
-Or download a standalone binary from the [latest release](../../releases/latest)
-(`catalyst-windows-amd64.exe`, `catalyst-linux-amd64`, `catalyst-darwin-amd64`, `catalyst-darwin-arm64`).
+or in one line, without toolkit installed:
+
+```powershell
+irm https://downloads.alulore.com/tools/catalyst.ps1 | iex
+```
+
+Upgrade with `toolkit upgrade catalyst`. The install also registers the `catalyst` MCP server and the `catalyst` skill for OpenCode, Claude Code and Codex, so agents can use Catalyst without further setup.
 
 ## Breaking change in this version
 
@@ -527,7 +532,7 @@ Two deliberate limits keep the write surface to what the repository already decl
 output files of **configured** clients (there is no way to pass an output path), and there is **no `insecure` option**: a
 `source` URL is always validated, and only a configured client's own `insecure` setting relaxes TLS validation.
 
-Setup:
+Installing with toolkit registers this server for OpenCode, Claude Code and Codex, so none of the setup below is needed there. For other clients, or a manual install:
 
 ```bash
 # Claude Code
@@ -568,10 +573,7 @@ Claude Desktop (`claude_desktop_config.json`) does not start servers in your rep
 
 ## Releases
 
-Pushing a tag such as `v0.3.0` runs CI and publishes:
-
-- the `catalyst-cli` NuGet package to GitHub Packages, and
-- standalone binaries attached to the GitHub release, with `.sha256` checksums.
+Releases of the installed tool are cut with `toolkit release` (see `toolkit.json`). Pushing a tag such as `v0.3.0` also runs CI and attaches the Windows x64 Native AOT binary (`catalyst-windows-amd64.exe`) to the GitHub release, with a `.sha256` checksum.
 
 The [Syncfully Workbench](https://github.com/Syncfully/syncfully-db-workbench) downloads the
 matching binary from `releases/latest/download` and verifies its checksum and `--version`.

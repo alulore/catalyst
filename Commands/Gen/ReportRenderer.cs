@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Text.Json;
 using Catalyst.Common.Models;
+using Catalyst.Common.Serialization;
 using Catalyst.Common.Services;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
@@ -26,7 +27,7 @@ internal static class ReportRenderer
     /// <summary>One JSON document on stdout, nothing else. The text goes to the console's raw writer.</summary>
     private static void WriteJson(RunReport report)
     {
-        Terminal.Out.Profile.Out.Writer.WriteLine(JsonSerializer.Serialize(report, RunReport.JsonOptions));
+        Terminal.Out.Profile.Out.Writer.WriteLine(JsonSerializer.Serialize(report, CatalystJson.Report.RunReport));
     }
 
     private static void WriteText(RunReport report)

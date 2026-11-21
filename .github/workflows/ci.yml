@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     tags: ['v*']
   pull_request:
 
@@ -34,12 +34,9 @@ jobs:
       - name: Test
         run: dotnet test --no-build --configuration Release --verbosity normal
 
-  publish:
+  aot-smoke:
     needs: build-and-test
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      packages: write
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -51,39 +48,24 @@ jobs:
       - name: Configure private feed
         run: dotnet nuget update source github-auxil --username USERNAME --password ${{ secrets.AUXIL_PACKAGES_TOKEN }} --store-password-in-clear-text
 
-      - name: Read version
-        id: version
-        shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Publish Native AOT
+        run: pwsh -NoProfile -File scripts/build-artifact.ps1
 
-      - name: Pack
-        run: dotnet pack --configuration Release --output ./nupkg /p:Version=${{ steps.version.outputs.version }}
-
-      - name: Push to GitHub Packages
-        run: dotnet nuget push ./nupkg/*.nupkg --source https://nuget.pkg.github.com/alexpetrou94/index.json --api-key ${{ secrets.GITHUB_TOKEN }} --skip-duplicate
+      - name: Smoke run
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./dist/Catalyst.exe --version
+          if ($LASTEXITCODE -ne 0) { throw '--version failed' }
+          $report = ./dist/Catalyst.exe gen openapi --source Catalyst.Tests/Fixtures/Specs/minimal.json --json | Out-String | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or -not $report.success) { throw 'gen openapi failed' }
 
   release-binaries:
-    needs: build-and-test
+    needs: [build-and-test, aot-smoke]
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - rid: win-x64
-            asset: catalyst-windows-amd64.exe
-            binary: Catalyst.exe
-          - rid: linux-x64
-            asset: catalyst-linux-amd64
-            binary: Catalyst
-          - rid: osx-x64
-            asset: catalyst-darwin-amd64
-            binary: Catalyst
-          - rid: osx-arm64
-            asset: catalyst-darwin-arm64
-            binary: Catalyst
     steps:
       - uses: actions/checkout@v5
 
@@ -100,25 +82,21 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Publish ${{ matrix.rid }}
-        run: >
-          dotnet publish Catalyst.csproj
-          --configuration Release
-          --runtime ${{ matrix.rid }}
-          --self-contained false
-          --output ./publish
-          /p:PublishSingleFile=true
-          /p:DebugType=None
-          /p:DebugSymbols=false
-          /p:Version=${{ steps.version.outputs.version }}
+      - name: Publish win-x64 Native AOT
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer'
+          $env:PATH = "$installer;$env:PATH"
+          dotnet publish Catalyst.csproj --configuration Release --runtime win-x64 -p:PublishAot=true -p:DebugType=None -p:DebugSymbols=false -p:Version=${{ steps.version.outputs.version }} --output ./publish
+          if ($LASTEXITCODE -ne 0) { throw 'publish failed' }
 
       - name: Package release assets
         shell: bash
         run: |
           mkdir -p dist
-          mv "./publish/${{ matrix.binary }}" "dist/${{ matrix.asset }}"
-          chmod +x "dist/${{ matrix.asset }}"
-          sha256sum "dist/${{ matrix.asset }}" > "dist/${{ matrix.asset }}.sha256"
+          mv ./publish/Catalyst.exe dist/catalyst-windows-amd64.exe
+          sha256sum dist/catalyst-windows-amd64.exe > dist/catalyst-windows-amd64.exe.sha256
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
