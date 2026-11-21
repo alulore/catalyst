@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Catalyst.Common.Models;
 
@@ -71,12 +70,6 @@ internal sealed record DiagnosticEntry(string Severity, string? Pointer, string 
 /// </summary>
 internal sealed class RunReport
 {
-    public static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true,
-    };
-
     public int SchemaVersion => 1;
     public string Command => "gen openapi";
     public required string Mode { get; init; }

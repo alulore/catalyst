@@ -22,7 +22,7 @@ internal static class McpRegistration
                     + "Start with list_clients, then list_operations and show_operation to learn how to call an endpoint; "
                     + "use diff_spec to see what a spec change breaks and generate_clients to regenerate.";
             })
-            .WithTools([typeof(CatalystTools)]);
+            .WithTools<CatalystTools>();
     }
 
     private static string Version()

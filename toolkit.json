@@ -1,0 +1,24 @@
+{
+  "id": "catalyst",
+  "name": "catalyst",
+  "description": "Typed TypeScript API clients from OpenAPI specs, with an MCP server for agents",
+  "protocol": 1,
+  "runtime": "native",
+  "versionFile": "Catalyst.csproj",
+  "entrypoint": "catalyst.exe",
+  "build": ["pwsh", "-NoProfile", "-File", "scripts/build-artifact.ps1"],
+  "commands": [
+    "catalyst gen openapi",
+    "catalyst gen openapi --check",
+    "catalyst api show \"GET /items/{id}\"",
+    "catalyst mcp"
+  ],
+  "package": [
+    { "from": "dist/Catalyst.exe", "to": "catalyst.exe" },
+    { "from": "skills", "to": "skills" }
+  ],
+  "agents": {
+    "mcp": { "name": "catalyst", "args": ["mcp"] },
+    "skills": ["skills/catalyst"]
+  }
+}

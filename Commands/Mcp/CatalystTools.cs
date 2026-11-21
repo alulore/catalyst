@@ -5,6 +5,7 @@ using Catalyst.Commands.Api;
 using Catalyst.Commands.Gen;
 using Catalyst.Common.Configuration;
 using Catalyst.Common.Models;
+using Catalyst.Common.Serialization;
 using Catalyst.Common.Services;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -19,7 +20,7 @@ namespace Catalyst.Commands.Mcp;
 /// and a source URL passed directly is always validated.
 /// </summary>
 [McpServerToolType]
-internal static class CatalystTools
+internal sealed class CatalystTools
 {
     private const string SelectionHelp =
         "Which API: pass `client` (a name from list_clients) or `source` (a spec file path or URL). "
@@ -34,17 +35,19 @@ internal static class CatalystTools
 
         if (loaded.Error is not null)
         {
-            return Result(new { schemaVersion = 1, command = "list_clients", success = false, error = new { code = IssueCodes.ConfigInvalid, message = loaded.Error } }, loaded.Error, isError: true);
+            ListClientsFailure failure = new(1, "list_clients", false, new Issue(IssueCodes.ConfigInvalid, loaded.Error));
+            return Result(JsonSerializer.SerializeToElement(failure, CatalystJson.Report.ListClientsFailure), loaded.Error, isError: true);
         }
 
-        var clients = (loaded.Config?.Gen.OpenApi.Clients ?? [])
-            .Select(c => new { name = c.Name, source = c.Source, output = c.Output })
+        List<ClientSummary> clients = (loaded.Config?.Gen.OpenApi.Clients ?? [])
+            .Select(c => new ClientSummary(c.Name, c.Source, c.Output))
             .ToList();
         string summary = clients.Count == 0
             ? "No clients configured."
-            : string.Join(Environment.NewLine, clients.Select(c => $"{c.name}  source: {c.source}  output: {c.output}"));
+            : string.Join(Environment.NewLine, clients.Select(c => $"{c.Name}  source: {c.Source}  output: {c.Output}"));
 
-        return Result(new { schemaVersion = 1, command = "list_clients", success = true, configPath = loaded.Path, clients, error = (object?)null }, summary, isError: false);
+        ListClientsReport report = new(1, "list_clients", true, loaded.Path, clients, null);
+        return Result(JsonSerializer.SerializeToElement(report, CatalystJson.Report.ListClientsReport), summary, isError: false);
     }
 
     [McpServerTool(Name = "list_operations", ReadOnly = true, Idempotent = true)]
@@ -141,7 +144,7 @@ internal static class CatalystTools
         }
 
         bool isError = report.Error != null || report.Results.Any(r => r.Failed);
-        return Result(JsonSerializer.SerializeToElement(report, RunReport.JsonOptions), summary.ToString().TrimEnd(), isError);
+        return Result(JsonSerializer.SerializeToElement(report, CatalystJson.Report.RunReport), summary.ToString().TrimEnd(), isError);
     }
 
     /// <summary>Selects the spec exactly like the CLI (--client / --source / the only configured client) and answers from its model.</summary>
@@ -166,11 +169,6 @@ internal static class CatalystTools
             Content = [new TextContentBlock { Text = report.ToText() }],
             StructuredContent = JsonDocument.Parse(report.ToJson()).RootElement.Clone(),
         };
-    }
-
-    private static CallToolResult Result(object payload, string text, bool isError)
-    {
-        return Result(JsonSerializer.SerializeToElement(payload, RunReport.JsonOptions), text, isError);
     }
 
     private static CallToolResult Result(JsonElement payload, string text, bool isError)

@@ -6,14 +6,21 @@
         <LangVersion>latestmajor</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <PackAsTool>true</PackAsTool>
-        <ToolCommandName>catalyst</ToolCommandName>
-        <PackageId>catalyst-cli</PackageId>
         <Version>0.6.1</Version>
         <Description>Modular CLI toolkit for automating code generation and development tasks</Description>
         <Authors>alexpetrou94</Authors>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <RepositoryUrl>https://github.com/alexpetrou94/catalyst</RepositoryUrl>
+        <RepositoryUrl>https://github.com/alulore/catalyst</RepositoryUrl>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+        <OptimizationPreference>Size</OptimizationPreference>
+        <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+        <EventSourceSupport>false</EventSourceSupport>
+        <DebuggerSupport>false</DebuggerSupport>
+        <MetricsSupport>false</MetricsSupport>
+        <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+        <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     </PropertyGroup>
 
     <ItemGroup>
@@ -36,7 +43,7 @@
       <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
       <PackageReference Include="Spectre.Console" Version="0.55.2" />
       <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
-      <PackageReference Include="Auxil" Version="0.1.0" />
+      <PackageReference Include="Auxil" Version="0.2.0" />
     </ItemGroup>
 
 </Project>
