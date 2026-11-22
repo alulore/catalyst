@@ -1,5 +1,6 @@
 using Catalyst.Commands.Gen;
 using Catalyst.Common.Configuration;
+using Shouldly;
 
 namespace Catalyst.Tests.Commands;
 
@@ -18,21 +19,20 @@ public class ConfiguredClientRunnerTests
 
     private static string CreateTempDirectory()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-runner-tests", Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-runner-tests",
+            Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(dir);
         return dir;
     }
 
-    private static CatalystConfig ConfigWith(params OpenApiClientConfig[] clients) => new()
-    {
-        Gen = new GenConfig
+    private static CatalystConfig ConfigWith(params OpenApiClientConfig[] clients) =>
+        new()
         {
-            OpenApi = new OpenApiGenConfig
-            {
-                Clients = clients.ToList()
-            }
-        }
-    };
+            Gen = new GenConfig { OpenApi = new OpenApiGenConfig { Clients = clients.ToList() } },
+        };
 
     [Fact]
     public async Task RunAsync_GeneratesEveryConfiguredClient_RelativeToTheConfigDirectory()
@@ -40,23 +40,44 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = ConfigWith(
-                new OpenApiClientConfig { Name = "FirstApi", Source = "openapi.json", Output = "clients" },
-                new OpenApiClientConfig { Name = "SecondApi", Source = "openapi.json", Output = Path.Combine("clients", "second.ts") });
+                new OpenApiClientConfig
+                {
+                    Name = "FirstApi",
+                    Source = "openapi.json",
+                    Output = "clients",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "SecondApi",
+                    Source = "openapi.json",
+                    Output = Path.Combine("clients", "second.ts"),
+                }
+            );
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.All(outcomes, (outcome) => Assert.True(!outcome.Failed, outcome.Error?.Message));
+            outcomes.Where(o => o.Failed).Select(o => o.Error?.Message).ShouldBeEmpty();
 
             string first = Path.Combine(dir, "clients", "FirstApi.ts");
             string second = Path.Combine(dir, "clients", "second.ts");
-            Assert.True(File.Exists(first));
-            Assert.True(File.Exists(second));
-            Assert.Equal(first, outcomes[0].OutputPath);
-            Assert.Equal(second, outcomes[1].OutputPath);
-            Assert.Contains("FirstApi", File.ReadAllText(first));
+            File.Exists(first).ShouldBeTrue();
+            File.Exists(second).ShouldBeTrue();
+            outcomes[0].OutputPath.ShouldBe(first);
+            outcomes[1].OutputPath.ShouldBe(second);
+            (
+                await File.ReadAllTextAsync(first, TestContext.Current.CancellationToken)
+            ).ShouldContain("FirstApi", Case.Sensitive);
         }
         finally
         {
@@ -70,7 +91,11 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = new()
             {
@@ -79,17 +104,32 @@ public class ConfiguredClientRunnerTests
                     OpenApi = new OpenApiGenConfig
                     {
                         SkipPaths = ["/skip"],
-                        Clients = [new OpenApiClientConfig { Name = "Api", Source = "openapi.json", Output = "out" }]
-                    }
-                }
+                        Clients =
+                        [
+                            new OpenApiClientConfig
+                            {
+                                Name = "Api",
+                                Source = "openapi.json",
+                                Output = "out",
+                            },
+                        ],
+                    },
+                },
             };
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.False(Assert.Single(outcomes).Failed);
-            string code = File.ReadAllText(Path.Combine(dir, "out", "Api.ts"));
-            Assert.Contains("/keep", code);
-            Assert.DoesNotContain("/skip", code);
+            outcomes.ShouldHaveSingleItem().Failed.ShouldBeFalse();
+            string code = await File.ReadAllTextAsync(
+                Path.Combine(dir, "out", "Api.ts"),
+                TestContext.Current.CancellationToken
+            );
+            code.ShouldContain("/keep", Case.Sensitive);
+            code.ShouldNotContain("/skip", Case.Sensitive);
         }
         finally
         {
@@ -103,7 +143,11 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = new()
             {
@@ -119,19 +163,26 @@ public class ConfiguredClientRunnerTests
                                 Name = "Api",
                                 Source = "openapi.json",
                                 Output = "out",
-                                SkipPaths = ["/skip"]
-                            }
-                        ]
-                    }
-                }
+                                SkipPaths = ["/skip"],
+                            },
+                        ],
+                    },
+                },
             };
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.False(Assert.Single(outcomes).Failed);
-            string code = File.ReadAllText(Path.Combine(dir, "out", "Api.ts"));
-            Assert.Contains("/keep", code);
-            Assert.DoesNotContain("/skip", code);
+            outcomes.ShouldHaveSingleItem().Failed.ShouldBeFalse();
+            string code = await File.ReadAllTextAsync(
+                Path.Combine(dir, "out", "Api.ts"),
+                TestContext.Current.CancellationToken
+            );
+            code.ShouldContain("/keep", Case.Sensitive);
+            code.ShouldNotContain("/skip", Case.Sensitive);
         }
         finally
         {
@@ -145,18 +196,32 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = ConfigWith(
                 new OpenApiClientConfig { Name = "ComesLater", Output = "out" },
-                new OpenApiClientConfig { Name = "Works", Source = "openapi.json", Output = "out" });
+                new OpenApiClientConfig
+                {
+                    Name = "Works",
+                    Source = "openapi.json",
+                    Output = "out",
+                }
+            );
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.True(outcomes[0].Failed);
-            Assert.Contains("No source", outcomes[0].Error!.Message);
-            Assert.False(outcomes[1].Failed);
-            Assert.True(File.Exists(Path.Combine(dir, "out", "Works.ts")));
+            outcomes[0].Failed.ShouldBeTrue();
+            outcomes[0].Error.ShouldNotBeNull().Message.ShouldContain("No source", Case.Sensitive);
+            outcomes[1].Failed.ShouldBeFalse();
+            File.Exists(Path.Combine(dir, "out", "Works.ts")).ShouldBeTrue();
         }
         finally
         {
@@ -170,17 +235,38 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = ConfigWith(
-                new OpenApiClientConfig { Name = "", Source = "openapi.json", Output = "out" },
-                new OpenApiClientConfig { Name = "NoOutput", Source = "openapi.json", Output = "  " });
+                new OpenApiClientConfig
+                {
+                    Name = "",
+                    Source = "openapi.json",
+                    Output = "out",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "NoOutput",
+                    Source = "openapi.json",
+                    Output = "  ",
+                }
+            );
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.All(outcomes, (outcome) => Assert.True(outcome.Failed));
-            Assert.Equal("(unnamed)", outcomes[0].Name);
-            Assert.Contains("name and an output", outcomes[1].Error!.Message);
+            outcomes.ShouldAllBe(o => o.Failed);
+            outcomes[0].Name.ShouldBe("(unnamed)");
+            outcomes[1]
+                .Error.ShouldNotBeNull()
+                .Message.ShouldContain("name and an output", Case.Sensitive);
         }
         finally
         {
@@ -195,13 +281,23 @@ public class ConfiguredClientRunnerTests
         try
         {
             CatalystConfig config = ConfigWith(
-                new OpenApiClientConfig { Name = "Api", Source = "missing.json", Output = "out" });
+                new OpenApiClientConfig
+                {
+                    Name = "Api",
+                    Source = "missing.json",
+                    Output = "out",
+                }
+            );
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            ClientResult outcome = Assert.Single(outcomes);
-            Assert.True(outcome.Failed);
-            Assert.Contains("File not found", outcome.Error!.Message);
+            ClientResult outcome = outcomes.ShouldHaveSingleItem();
+            outcome.Failed.ShouldBeTrue();
+            outcome.Error.ShouldNotBeNull().Message.ShouldContain("File not found", Case.Sensitive);
         }
         finally
         {
@@ -209,26 +305,45 @@ public class ConfiguredClientRunnerTests
         }
     }
 
+    /// <summary>A NUL in the output path makes the file system throw an ArgumentException, not an IOException.</summary>
     [Fact]
     public async Task RunAsync_ContinuesWithTheNextClient_WhenOneThrowsUnexpectedly()
     {
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
 
-            // A NUL in the output path makes the file system throw an ArgumentException, not an IOException.
             CatalystConfig config = ConfigWith(
-                new OpenApiClientConfig { Name = "Broken", Source = "openapi.json", Output = "bad\0dir" },
-                new OpenApiClientConfig { Name = "Works", Source = "openapi.json", Output = "out" });
+                new OpenApiClientConfig
+                {
+                    Name = "Broken",
+                    Source = "openapi.json",
+                    Output = "bad\0dir",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "Works",
+                    Source = "openapi.json",
+                    Output = "out",
+                }
+            );
 
-            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None);
+            List<ClientResult> outcomes = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None
+            );
 
-            Assert.True(outcomes[0].Failed);
-            Assert.Equal("Broken", outcomes[0].Name);
-            Assert.False(string.IsNullOrWhiteSpace(outcomes[0].Error!.Message));
-            Assert.False(outcomes[1].Failed);
-            Assert.True(File.Exists(Path.Combine(dir, "out", "Works.ts")));
+            outcomes[0].Failed.ShouldBeTrue();
+            outcomes[0].Name.ShouldBe("Broken");
+            string.IsNullOrWhiteSpace(outcomes[0].Error.ShouldNotBeNull().Message).ShouldBeFalse();
+            outcomes[1].Failed.ShouldBeFalse();
+            File.Exists(Path.Combine(dir, "out", "Works.ts")).ShouldBeTrue();
         }
         finally
         {
@@ -242,14 +357,29 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
-            CatalystConfig config = ConfigWith(new OpenApiClientConfig { Name = "Api", Source = "openapi.json", Output = "out" });
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
+            CatalystConfig config = ConfigWith(
+                new OpenApiClientConfig
+                {
+                    Name = "Api",
+                    Source = "openapi.json",
+                    Output = "out",
+                }
+            );
 
-            ClientResult first = Assert.Single(await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None));
-            ClientResult second = Assert.Single(await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None));
+            ClientResult first = (
+                await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None)
+            ).ShouldHaveSingleItem();
+            ClientResult second = (
+                await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None)
+            ).ShouldHaveSingleItem();
 
-            Assert.Equal(ClientStatus.Written, first.Status);
-            Assert.Equal(ClientStatus.Unchanged, second.Status);
+            first.Status.ShouldBe(ClientStatus.Written);
+            second.Status.ShouldBe(ClientStatus.Unchanged);
         }
         finally
         {
@@ -263,13 +393,28 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "broken.json"), "{ \"openapi\": ");
-            CatalystConfig config = ConfigWith(new OpenApiClientConfig { Name = "Api", Source = "broken.json", Output = "out" });
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "broken.json"),
+                "{ \"openapi\": ",
+                TestContext.Current.CancellationToken
+            );
+            CatalystConfig config = ConfigWith(
+                new OpenApiClientConfig
+                {
+                    Name = "Api",
+                    Source = "broken.json",
+                    Output = "out",
+                }
+            );
 
-            ClientResult outcome = Assert.Single(await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None));
+            ClientResult outcome = (
+                await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None)
+            ).ShouldHaveSingleItem();
 
-            Assert.True(outcome.Failed);
-            Assert.DoesNotContain("empty result", outcome.Error!.Message);
+            outcome.Failed.ShouldBeTrue();
+            outcome
+                .Error.ShouldNotBeNull()
+                .Message.ShouldNotContain("empty result", Case.Sensitive);
         }
         finally
         {
@@ -283,26 +428,74 @@ public class ConfiguredClientRunnerTests
         string dir = CreateTempDirectory();
         try
         {
-            File.WriteAllText(Path.Combine(dir, "openapi.json"), Spec);
-            CatalystConfig generate = ConfigWith(new OpenApiClientConfig { Name = "Current", Source = "openapi.json", Output = "out" });
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, "openapi.json"),
+                Spec,
+                TestContext.Current.CancellationToken
+            );
+            CatalystConfig generate = ConfigWith(
+                new OpenApiClientConfig
+                {
+                    Name = "Current",
+                    Source = "openapi.json",
+                    Output = "out",
+                }
+            );
             await ConfiguredClientRunner.RunAsync(generate, dir, CancellationToken.None);
 
             string staleFile = Path.Combine(dir, "out", "Stale.ts");
-            File.WriteAllText(staleFile, "// hand edited");
+            await File.WriteAllTextAsync(
+                staleFile,
+                "// hand edited",
+                TestContext.Current.CancellationToken
+            );
 
             CatalystConfig config = ConfigWith(
-                new OpenApiClientConfig { Name = "Current", Source = "openapi.json", Output = "out" },
-                new OpenApiClientConfig { Name = "Stale", Source = "openapi.json", Output = "out" },
-                new OpenApiClientConfig { Name = "Absent", Source = "openapi.json", Output = "out" },
-                new OpenApiClientConfig { Name = "Broken", Source = "gone.json", Output = "out" });
+                new OpenApiClientConfig
+                {
+                    Name = "Current",
+                    Source = "openapi.json",
+                    Output = "out",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "Stale",
+                    Source = "openapi.json",
+                    Output = "out",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "Absent",
+                    Source = "openapi.json",
+                    Output = "out",
+                },
+                new OpenApiClientConfig
+                {
+                    Name = "Broken",
+                    Source = "gone.json",
+                    Output = "out",
+                }
+            );
 
-            List<ClientResult> results = await ConfiguredClientRunner.RunAsync(config, dir, CancellationToken.None, check: true);
+            List<ClientResult> results = await ConfiguredClientRunner.RunAsync(
+                config,
+                dir,
+                CancellationToken.None,
+                check: true
+            );
 
-            Assert.Equal(
-                [ClientStatus.UpToDate, ClientStatus.Stale, ClientStatus.Missing, ClientStatus.Failed],
-                results.Select(r => r.Status));
-            Assert.Equal("// hand edited", File.ReadAllText(staleFile));
-            Assert.False(File.Exists(Path.Combine(dir, "out", "Absent.ts")));
+            results
+                .Select(r => r.Status)
+                .ShouldBe([
+                    ClientStatus.UpToDate,
+                    ClientStatus.Stale,
+                    ClientStatus.Missing,
+                    ClientStatus.Failed,
+                ]);
+            (
+                await File.ReadAllTextAsync(staleFile, TestContext.Current.CancellationToken)
+            ).ShouldBe("// hand edited");
+            File.Exists(Path.Combine(dir, "out", "Absent.ts")).ShouldBeFalse();
         }
         finally
         {

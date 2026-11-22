@@ -1,3 +1,5 @@
+using Shouldly;
+
 namespace Catalyst.Tests.Services;
 
 public class TypeScriptNamingTests
@@ -13,7 +15,7 @@ public class TypeScriptNamingTests
     [InlineData("_", "param")]
     public void SanitizeIdentifier_HandlesCases(string input, string expected)
     {
-        Assert.Equal(expected, TypeScriptNaming.SanitizeIdentifier(input));
+        TypeScriptNaming.SanitizeIdentifier(input).ShouldBe(expected);
     }
 
     [Theory]
@@ -22,7 +24,7 @@ public class TypeScriptNamingTests
     [InlineData("a-b", "a_b")]
     public void SanitizeIdentifier_AsParameter_StaysAValidBinding(string input, string expected)
     {
-        Assert.Equal(expected, TypeScriptNaming.SanitizeIdentifier(input, asParameter: true));
+        TypeScriptNaming.SanitizeIdentifier(input, asParameter: true).ShouldBe(expected);
     }
 
     [Theory]
@@ -32,7 +34,7 @@ public class TypeScriptNamingTests
     [InlineData("API", "Api")]
     public void ToPascalCase_HandlesCases(string input, string expected)
     {
-        Assert.Equal(expected, TypeScriptNaming.ToPascalCase(input));
+        TypeScriptNaming.ToPascalCase(input).ShouldBe(expected);
     }
 
     [Theory]
@@ -44,7 +46,7 @@ public class TypeScriptNamingTests
     [InlineData("say \"hi\"", "\"say \\\"hi\\\"\"")]
     public void QuoteKey_QuotesOnlyWhatIsNotAnIdentifier(string key, string expected)
     {
-        Assert.Equal(expected, TypeScriptNaming.QuoteKey(key));
+        TypeScriptNaming.QuoteKey(key).ShouldBe(expected);
     }
 
     [Theory]
@@ -62,29 +64,36 @@ public class TypeScriptNamingTests
     {
         Dictionary<string, string> names = TypeScriptNaming.BuildComponentNames([key]);
 
-        Assert.Equal(expected, names[key]);
+        names[key].ShouldBe(expected);
     }
 
+    /// <summary>"Item.Dto" is listed first but must not take the name of the valid key "Item_Dto".</summary>
     [Fact]
     public void BuildComponentNames_KeepsValidKeysAndDisambiguatesTheRest()
     {
-        // "Item.Dto" is listed first but must not take the name of the valid key "Item_Dto".
-        Dictionary<string, string> names = TypeScriptNaming.BuildComponentNames(["Item.Dto", "Item_Dto", "Item-Dto"]);
+        Dictionary<string, string> names = TypeScriptNaming.BuildComponentNames([
+            "Item.Dto",
+            "Item_Dto",
+            "Item-Dto",
+        ]);
 
-        Assert.Equal("Item_Dto", names["Item_Dto"]);
-        Assert.Equal("Item_Dto_2", names["Item.Dto"]);
-        Assert.Equal("Item_Dto_3", names["Item-Dto"]);
-        Assert.Equal(3, names.Values.Distinct().Count());
+        names["Item_Dto"].ShouldBe("Item_Dto");
+        names["Item.Dto"].ShouldBe("Item_Dto_2");
+        names["Item-Dto"].ShouldBe("Item_Dto_3");
+        names.Values.Distinct().Count().ShouldBe(3);
     }
 
     [Fact]
     public void BuildComponentNames_AvoidsNamesTheGeneratedFileDeclares()
     {
-        Dictionary<string, string> names = TypeScriptNaming.BuildComponentNames(["ApiResult", "Get", "PetClient"], reserved: ["PetClient"]);
+        Dictionary<string, string> names = TypeScriptNaming.BuildComponentNames(
+            ["ApiResult", "Get", "PetClient"],
+            reserved: ["PetClient"]
+        );
 
-        Assert.Equal("ApiResult_2", names["ApiResult"]);
-        Assert.Equal("Get_2", names["Get"]);
-        Assert.Equal("PetClient_2", names["PetClient"]);
+        names["ApiResult"].ShouldBe("ApiResult_2");
+        names["Get"].ShouldBe("Get_2");
+        names["PetClient"].ShouldBe("PetClient_2");
     }
 
     [Theory]
@@ -99,8 +108,13 @@ public class TypeScriptNamingTests
     [InlineData("FindPetsByStatus", "get", false, "findPetsByStatus")]
     [InlineData("UpdatePet", "put", false, "updatePet")]
     [InlineData("BatchGetItems", "post", false, "batchGetItems")]
-    public void StripHttpVerbPrefix_ReturnsACamelCaseName_AndOnlyStripsAtAWordBoundary(string name, string verb, bool pathDerived, string expected)
+    public void StripHttpVerbPrefix_ReturnsACamelCaseName_AndOnlyStripsAtAWordBoundary(
+        string name,
+        string verb,
+        bool pathDerived,
+        string expected
+    )
     {
-        Assert.Equal(expected, TypeScriptNaming.StripHttpVerbPrefix(name, verb, pathDerived));
+        TypeScriptNaming.StripHttpVerbPrefix(name, verb, pathDerived).ShouldBe(expected);
     }
 }

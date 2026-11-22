@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Catalyst.Common.Serialization;
 using Auxil.Extensions;
+using Catalyst.Common.Serialization;
 
 namespace Catalyst.Common.Services;
 
@@ -13,14 +13,68 @@ internal static class TypeScriptNaming
 {
     private static readonly HashSet<string> ReservedWords =
     [
-        "break", "case", "catch", "class", "const", "continue", "debugger", "default",
-        "delete", "do", "else", "export", "extends", "finally", "for", "function",
-        "if", "import", "in", "instanceof", "new", "return", "super", "switch",
-        "this", "throw", "try", "typeof", "var", "void", "while", "with", "yield",
-        "let", "static", "enum", "await", "implements", "interface", "package",
-        "private", "protected", "public", "abstract", "boolean", "byte", "char",
-        "double", "final", "float", "goto", "int", "long", "native", "short",
-        "synchronized", "throws", "transient", "volatile", "null", "true", "false"
+        "break",
+        "case",
+        "catch",
+        "class",
+        "const",
+        "continue",
+        "debugger",
+        "default",
+        "delete",
+        "do",
+        "else",
+        "export",
+        "extends",
+        "finally",
+        "for",
+        "function",
+        "if",
+        "import",
+        "in",
+        "instanceof",
+        "new",
+        "return",
+        "super",
+        "switch",
+        "this",
+        "throw",
+        "try",
+        "typeof",
+        "var",
+        "void",
+        "while",
+        "with",
+        "yield",
+        "let",
+        "static",
+        "enum",
+        "await",
+        "implements",
+        "interface",
+        "package",
+        "private",
+        "protected",
+        "public",
+        "abstract",
+        "boolean",
+        "byte",
+        "char",
+        "double",
+        "final",
+        "float",
+        "goto",
+        "int",
+        "long",
+        "native",
+        "short",
+        "synchronized",
+        "throws",
+        "transient",
+        "volatile",
+        "null",
+        "true",
+        "false",
     ];
 
     /// <summary>
@@ -29,13 +83,45 @@ internal static class TypeScriptNaming
     /// </summary>
     private static readonly HashSet<string> ReservedTypeNames =
     [
-        "ProblemDetail", "ApiResult", "ClientOptions", "RequestOptions", "createClient",
-        "Get", "Put", "Post", "Delete", "Options", "Head", "Patch", "Trace",
-        "Record", "Promise", "Array", "Object", "String", "Number", "Boolean", "Error",
-        "AbortSignal", "RequestCredentials", "BodyInit", "FormData", "Blob", "ArrayBuffer",
-        "URLSearchParams", "Response",
-        "string", "number", "boolean", "any", "unknown", "never", "object", "symbol",
-        "bigint", "undefined",
+        "ProblemDetail",
+        "ApiResult",
+        "ClientOptions",
+        "RequestOptions",
+        "createClient",
+        "Get",
+        "Put",
+        "Post",
+        "Delete",
+        "Options",
+        "Head",
+        "Patch",
+        "Trace",
+        "Record",
+        "Promise",
+        "Array",
+        "Object",
+        "String",
+        "Number",
+        "Boolean",
+        "Error",
+        "AbortSignal",
+        "RequestCredentials",
+        "BodyInit",
+        "FormData",
+        "Blob",
+        "ArrayBuffer",
+        "URLSearchParams",
+        "Response",
+        "string",
+        "number",
+        "boolean",
+        "any",
+        "unknown",
+        "never",
+        "object",
+        "symbol",
+        "bigint",
+        "undefined",
     ];
 
     public static bool IsReservedTypeName(string name)
@@ -53,6 +139,10 @@ internal static class TypeScriptNaming
         return SanitizeIdentifier(value, asParameter: false);
     }
 
+    /// <summary>
+    /// Reserved words can't be used as bare identifiers in TypeScript. As property, method and type names they are
+    /// valid when quoted ("class"); as parameter bindings they must stay valid identifiers, so they get a "_" prefix.
+    /// </summary>
     public static string SanitizeIdentifier(string value, bool asParameter)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -67,9 +157,6 @@ internal static class TypeScriptNaming
             sanitized = "_" + sanitized;
         }
 
-        // Reserved words can't be used as bare identifiers in TypeScript.
-        //  - As property/method/type names they are valid when quoted ("class").
-        //  - As parameter bindings they must stay valid identifiers, so prefix "_".
         if (IsReservedWord(sanitized))
         {
             return asParameter ? "_" + sanitized : "\"" + sanitized + "\"";
@@ -83,6 +170,7 @@ internal static class TypeScriptNaming
         return sanitized;
     }
 
+    /// <summary>Separators are inserted at camelCase boundaries so the library's ToPascalCase treats each word independently (it otherwise lowercases the trailing text).</summary>
     public static string ToPascalCase(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -90,8 +178,6 @@ internal static class TypeScriptNaming
             return "Unknown";
         }
 
-        // Insert separators at camelCase boundaries so the library's ToPascalCase
-        // treats each word independently (it otherwise lowercases the trailing text).
         string separated = Regex.Replace(value, "(?<=[a-z0-9])(?=[A-Z])", " ");
         return separated.ToPascalCase();
     }
@@ -123,16 +209,16 @@ internal static class TypeScriptNaming
     /// <summary>Escapes text for the literal parts of a template string.</summary>
     public static string TemplateLiteralText(string value)
     {
-        return EscapeLiteral(value, "`").Replace("${", "\\${");
+        return EscapeLiteral(value, "`").Replace("${", "\\${", StringComparison.Ordinal);
     }
 
     private static string EscapeLiteral(string value, string quote)
     {
         return value
-            .Replace("\\", "\\\\")
-            .Replace(quote, "\\" + quote)
-            .Replace("\r", "\\r")
-            .Replace("\n", "\\n");
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace(quote, "\\" + quote, StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -172,14 +258,13 @@ internal static class TypeScriptNaming
     /// their name (unless it is reserved); the others are sanitised afterwards so they never take a
     /// valid key's name. <paramref name="reserved"/> lists names the generated file declares itself.
     /// </summary>
-    public static Dictionary<string, string> BuildComponentNames(IEnumerable<string> keys, IEnumerable<string>? reserved = null)
+    public static Dictionary<string, string> BuildComponentNames(
+        IEnumerable<string> keys,
+        IEnumerable<string>? reserved = null
+    )
     {
         List<string> keyList = keys.ToList();
-        HashSet<string> taken = new(ReservedTypeNames);
-        foreach (string name in reserved ?? [])
-        {
-            taken.Add(name);
-        }
+        HashSet<string> taken = [.. ReservedTypeNames, .. reserved ?? []];
 
         Dictionary<string, string> names = [];
 
@@ -224,9 +309,16 @@ internal static class TypeScriptNaming
     /// "postcodeLookup"); names derived from the path always start a new word after the verb. A digit never
     /// starts a method name.
     /// </summary>
-    public static string StripHttpVerbPrefix(string name, string httpMethod, bool pathDerived = false)
+    public static string StripHttpVerbPrefix(
+        string name,
+        string httpMethod,
+        bool pathDerived = false
+    )
     {
-        if (name.Length > httpMethod.Length && name.StartsWith(httpMethod, StringComparison.OrdinalIgnoreCase))
+        if (
+            name.Length > httpMethod.Length
+            && name.StartsWith(httpMethod, StringComparison.OrdinalIgnoreCase)
+        )
         {
             string stripped = name.Substring(httpMethod.Length);
             if (!char.IsDigit(stripped[0]) && (pathDerived || !char.IsLower(stripped[0])))

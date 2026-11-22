@@ -14,7 +14,7 @@ internal static partial class RenderedDeclarations
 
     public static Dictionary<string, string> Split(string code)
     {
-        string[] lines = code.Replace("\r\n", "\n").Split('\n');
+        string[] lines = code.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
         List<(int Start, string? Name)> blocks = [];
         bool inDocComment = false;
 
@@ -49,13 +49,13 @@ internal static partial class RenderedDeclarations
 
         for (int b = 0; b < blocks.Count; b++)
         {
-            if (blocks[b].Name == null)
+            if (blocks[b].Name is not { } name)
             {
                 continue;
             }
 
             int end = b + 1 < blocks.Count ? blocks[b + 1].Start : lines.Length;
-            result[blocks[b].Name!] = string.Join('\n', lines[blocks[b].Start..end]).TrimEnd();
+            result[name] = string.Join('\n', lines[blocks[b].Start..end]).TrimEnd();
         }
 
         return result;

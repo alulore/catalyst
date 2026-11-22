@@ -1,3 +1,5 @@
+using Shouldly;
+
 namespace Catalyst.Tests.Generation;
 
 /// <summary>The one YAML behaviour test: the original YAML spec generates exactly what its JSON conversion does.</summary>
@@ -7,16 +9,21 @@ public class YamlSpecTests
     public void Generate_FromYaml_EqualsTheSnapshotOfTheJsonVersion()
     {
         string yamlPath = TestPaths.SpecPath("museum", ".yaml");
-        Result<OpenApiParseResult> parsed = OpenApiParser.Parse(File.ReadAllText(yamlPath), yamlPath);
+        Result<OpenApiParseResult> parsed = OpenApiParser.Parse(
+            File.ReadAllText(yamlPath),
+            yamlPath
+        );
 
-        Assert.True(parsed.IsSuccess, parsed.ErrorMessage);
+        parsed.IsSuccess.ShouldBeTrue(parsed.ErrorMessage);
 
-        string code = SpecLoader.CreateGenerator(parsed.Value!.Document).Generate();
+        string code = SpecLoader
+            .CreateGenerator(parsed.Value.ShouldNotBeNull().Document)
+            .Generate();
         string snapshot = File.ReadAllText(TestPaths.SnapshotPath("museum"));
 
-        Assert.Equal(Normalize(snapshot), Normalize(code));
+        Normalize(code).ShouldBe(Normalize(snapshot));
     }
 
     private static string Normalize(string value) =>
-        value.Replace("\r\n", "\n").Trim();
+        value.Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
 }

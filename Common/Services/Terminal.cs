@@ -2,13 +2,6 @@ using Spectre.Console;
 
 namespace Catalyst.Common.Services;
 
-internal enum AnsiColor
-{
-    Green = 32,
-    Yellow = 33,
-    Red = 31,
-}
-
 /// <summary>
 /// The two output streams of the CLI: results and progress go to stdout (<see cref="Out"/>), errors and
 /// warnings go to stderr (<see cref="Error"/>), so a script can capture one without the other.
@@ -34,7 +27,10 @@ internal static class Terminal
     /// </summary>
     public static void WriteLine(IAnsiConsole console, string label, string text, AnsiColor color)
     {
-        string styledLabel = console.Profile.Capabilities.Ansi && console.Profile.Out.IsTerminal ? $"\u001b[{(int)color}m{label}\u001b[0m" : label;
+        string styledLabel =
+            console.Profile.Capabilities.Ansi && console.Profile.Out.IsTerminal
+                ? $"\u001b[{(int)color}m{label}\u001b[0m"
+                : label;
         console.Profile.Out.Writer.WriteLine($"{styledLabel} {text}");
     }
 
@@ -70,15 +66,13 @@ internal static class Terminal
 
     private static IAnsiConsole CreateErrorConsole()
     {
-        IAnsiConsole console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Out = new AnsiConsoleOutput(Console.Error),
-        });
+        IAnsiConsole console = AnsiConsole.Create(
+            new AnsiConsoleSettings { Out = new AnsiConsoleOutput(Console.Error) }
+        );
 
-        // Same rule as stdout in Program.cs: piped output stays on one line per message.
         if (Console.IsErrorRedirected)
         {
-            console.Profile.Width = 140;
+            console.Profile.Width = PipedConsole.Width;
         }
 
         return console;

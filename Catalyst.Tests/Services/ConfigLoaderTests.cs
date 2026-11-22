@@ -1,27 +1,34 @@
-using Catalyst.Common.Configuration;
 using System.Text.Json;
+using Catalyst.Common.Configuration;
+using Shouldly;
 
 namespace Catalyst.Tests.Services;
 
 public class ConfigLoaderTests
 {
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
     private static string WriteConfig(string directory, string fileName, CatalystConfig config)
     {
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, fileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+        File.WriteAllText(path, JsonSerializer.Serialize(config, IndentedJson));
         return path;
     }
 
     [Fact]
     public void Load_ReturnsNull_WhenNoConfigFilePresent()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
         Directory.CreateDirectory(dir);
 
         try
         {
-            Assert.Null(ConfigLoader.Load(dir));
+            ConfigLoader.Load(dir).ShouldBeNull();
         }
         finally
         {
@@ -32,24 +39,29 @@ public class ConfigLoaderTests
     [Fact]
     public void Load_ReadsSkipPaths_FromCatalystConfigJson()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
-        WriteConfig(dir, "catalyst.config.json", new CatalystConfig
-        {
-            Gen = new GenConfig
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
+        WriteConfig(
+            dir,
+            "catalyst.config.json",
+            new CatalystConfig
             {
-                OpenApi = new OpenApiGenConfig
+                Gen = new GenConfig
                 {
-                    SkipPaths = ["/api/auth/", "/internal/"]
-                }
+                    OpenApi = new OpenApiGenConfig { SkipPaths = ["/api/auth/", "/internal/"] },
+                },
             }
-        });
+        );
 
         try
         {
             CatalystConfig? loaded = ConfigLoader.Load(dir);
 
-            Assert.NotNull(loaded);
-            Assert.Equal(["/api/auth/", "/internal/"], loaded!.Gen.OpenApi.SkipPaths);
+            loaded.ShouldNotBeNull();
+            loaded.Gen.OpenApi.SkipPaths.ShouldBe(["/api/auth/", "/internal/"]);
         }
         finally
         {
@@ -60,24 +72,26 @@ public class ConfigLoaderTests
     [Fact]
     public void Load_ReadsSkipPaths_FromHiddenConfigFile()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
-        WriteConfig(dir, ".catalyst.config.json", new CatalystConfig
-        {
-            Gen = new GenConfig
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
+        WriteConfig(
+            dir,
+            ".catalyst.config.json",
+            new CatalystConfig
             {
-                OpenApi = new OpenApiGenConfig
-                {
-                    SkipPaths = ["/x/"]
-                }
+                Gen = new GenConfig { OpenApi = new OpenApiGenConfig { SkipPaths = ["/x/"] } },
             }
-        });
+        );
 
         try
         {
             CatalystConfig? loaded = ConfigLoader.Load(dir);
 
-            Assert.NotNull(loaded);
-            Assert.Contains("/x/", loaded!.Gen.OpenApi.SkipPaths);
+            loaded.ShouldNotBeNull();
+            loaded.ShouldNotBeNull().Gen.OpenApi.SkipPaths.ShouldContain("/x/");
         }
         finally
         {
@@ -88,25 +102,30 @@ public class ConfigLoaderTests
     [Fact]
     public void Load_WalksUpToParentDirectory()
     {
-        string parent = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
+        string parent = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
         string child = Path.Combine(parent, "sub", "deep");
-        WriteConfig(parent, "catalyst.config.json", new CatalystConfig
-        {
-            Gen = new GenConfig
+        WriteConfig(
+            parent,
+            "catalyst.config.json",
+            new CatalystConfig
             {
-                OpenApi = new OpenApiGenConfig
+                Gen = new GenConfig
                 {
-                    SkipPaths = ["/parent-only/"]
-                }
+                    OpenApi = new OpenApiGenConfig { SkipPaths = ["/parent-only/"] },
+                },
             }
-        });
+        );
 
         try
         {
             CatalystConfig? loaded = ConfigLoader.Load(child);
 
-            Assert.NotNull(loaded);
-            Assert.Contains("/parent-only/", loaded!.Gen.OpenApi.SkipPaths);
+            loaded.ShouldNotBeNull();
+            loaded.ShouldNotBeNull().Gen.OpenApi.SkipPaths.ShouldContain("/parent-only/");
         }
         finally
         {
@@ -117,57 +136,60 @@ public class ConfigLoaderTests
     [Fact]
     public void Load_ReadsFixtureConfigFile()
     {
-        string fixtureDir = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)!;
-        string fixturePath = Path.Combine(fixtureDir, "Fixtures", "catalyst.config.json");
+        CatalystConfig? loaded = ConfigLoader.Load(
+            Path.Combine(AppContext.BaseDirectory, "Fixtures")
+        );
 
-        if (!File.Exists(fixturePath))
-        {
-            return;
-        }
-
-        CatalystConfig? loaded = ConfigLoader.Load(Path.Combine(fixtureDir, "Fixtures"));
-
-        Assert.NotNull(loaded);
-        Assert.NotEmpty(loaded!.Gen.OpenApi.SkipPaths);
+        loaded.ShouldNotBeNull().Gen.OpenApi.SkipPaths.ShouldBe(["/api/auth/", "/internal/"]);
     }
 
     [Fact]
     public void Load_ReadsClientDefinitions()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
-        WriteConfig(dir, "catalyst.config.json", new CatalystConfig
-        {
-            Gen = new GenConfig
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
+        WriteConfig(
+            dir,
+            "catalyst.config.json",
+            new CatalystConfig
             {
-                OpenApi = new OpenApiGenConfig
+                Gen = new GenConfig
                 {
-                    SkipPaths = ["/project/"],
-                    Clients =
-                    [
-                        new OpenApiClientConfig
-                        {
-                            Name = "CommunicationApi",
-                            Source = "https://localhost:7036/openapi/v1.json",
-                            Output = "src/external-apis",
-                            Insecure = true,
-                            SkipPaths = ["/client/"]
-                        }
-                    ]
-                }
+                    OpenApi = new OpenApiGenConfig
+                    {
+                        SkipPaths = ["/project/"],
+                        Clients =
+                        [
+                            new OpenApiClientConfig
+                            {
+                                Name = "CommunicationApi",
+                                Source = "https://localhost:7036/openapi/v1.json",
+                                Output = "src/external-apis",
+                                Insecure = true,
+                                SkipPaths = ["/client/"],
+                            },
+                        ],
+                    },
+                },
             }
-        });
+        );
 
         try
         {
             CatalystConfig? loaded = ConfigLoader.Load(dir);
 
-            Assert.NotNull(loaded);
-            OpenApiClientConfig client = Assert.Single(loaded!.Gen.OpenApi.Clients);
-            Assert.Equal("CommunicationApi", client.Name);
-            Assert.Equal("https://localhost:7036/openapi/v1.json", client.Source);
-            Assert.Equal("src/external-apis", client.Output);
-            Assert.True(client.Insecure);
-            Assert.Equal(["/client/"], client.SkipPaths);
+            loaded.ShouldNotBeNull();
+            OpenApiClientConfig client = loaded
+                .ShouldNotBeNull()
+                .Gen.OpenApi.Clients.ShouldHaveSingleItem();
+            client.Name.ShouldBe("CommunicationApi");
+            client.Source.ShouldBe("https://localhost:7036/openapi/v1.json");
+            client.Output.ShouldBe("src/external-apis");
+            client.Insecure.ShouldBeTrue();
+            client.SkipPaths.ShouldBe(["/client/"]);
         }
         finally
         {
@@ -178,16 +200,20 @@ public class ConfigLoaderTests
     [Fact]
     public void LoadDetailed_ReportsConfigPathAndConfig()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
         string path = WriteConfig(dir, "catalyst.config.json", new CatalystConfig());
 
         try
         {
             ConfigLoadResult result = ConfigLoader.LoadDetailed(dir);
 
-            Assert.NotNull(result.Config);
-            Assert.Equal(path, result.Path);
-            Assert.Null(result.Error);
+            result.Config.ShouldNotBeNull();
+            result.Path.ShouldBe(path);
+            result.Error.ShouldBeNull();
         }
         finally
         {
@@ -198,16 +224,20 @@ public class ConfigLoaderTests
     [Fact]
     public void LoadDetailed_ReportsNothing_WhenNoConfigExists()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
         Directory.CreateDirectory(dir);
 
         try
         {
             ConfigLoadResult result = ConfigLoader.LoadDetailed(dir);
 
-            Assert.Null(result.Config);
-            Assert.Null(result.Path);
-            Assert.Null(result.Error);
+            result.Config.ShouldBeNull();
+            result.Path.ShouldBeNull();
+            result.Error.ShouldBeNull();
         }
         finally
         {
@@ -218,7 +248,11 @@ public class ConfigLoaderTests
     [Fact]
     public void LoadDetailed_ReportsThePathAndReason_ForInvalidJson()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-config-tests", Guid.NewGuid().ToString());
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-config-tests",
+            Guid.NewGuid().ToString()
+        );
         Directory.CreateDirectory(dir);
         string path = Path.Combine(dir, "catalyst.config.json");
         File.WriteAllText(path, "{ not json");
@@ -227,9 +261,9 @@ public class ConfigLoaderTests
         {
             ConfigLoadResult result = ConfigLoader.LoadDetailed(dir);
 
-            Assert.Null(result.Config);
-            Assert.Equal(path, result.Path);
-            Assert.NotNull(result.Error);
+            result.Config.ShouldBeNull();
+            result.Path.ShouldBe(path);
+            result.Error.ShouldNotBeNull();
         }
         finally
         {

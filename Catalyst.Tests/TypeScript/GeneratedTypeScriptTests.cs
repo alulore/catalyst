@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Shouldly;
 
 namespace Catalyst.Tests.TypeScript;
 
@@ -19,65 +20,92 @@ public class GeneratedTypeScriptTests
     }
 
     [Fact]
-    public void Snapshots_CompileWithTscStrict()
+    public async Task GeneratedClients_PassTheNodeRuntimeTests()
     {
-        ToolResult result = _toolchain.Compile.Value;
+        ToolResult compile = _toolchain.Compile;
+        compile.ExitCode.ShouldBe(
+            0,
+            "tsc must compile the snapshots with strict settings before the runtime tests can run:"
+                + Environment.NewLine
+                + compile.Output
+        );
 
-        Assert.True(result.ExitCode == 0, "tsc reported errors:" + Environment.NewLine + result.Output);
-    }
+        ToolResult result = await TypeScriptToolchain.RunAsync(
+            "node",
+            ["--test", "runtime/*.test.mjs"],
+            TestPaths.TypeScriptDirectory
+        );
 
-    [Fact]
-    public void GeneratedClients_PassTheNodeRuntimeTests()
-    {
-        ToolResult compile = _toolchain.Compile.Value;
-        Assert.True(compile.ExitCode == 0, "tsc must compile the snapshots before the runtime tests can run:" + Environment.NewLine + compile.Output);
-
-        ToolResult result = TypeScriptToolchain.Run("node", ["--test", "runtime/*.test.mjs"], TestPaths.TypeScriptDirectory);
-
-        Assert.True(result.ExitCode == 0, "node --test failed:" + Environment.NewLine + result.Output);
+        result.ExitCode.ShouldBe(0, "node --test failed:" + Environment.NewLine + result.Output);
     }
 }
 
 /// <summary>Every test class that needs the TypeScript toolchain shares one instance, so npm ci never runs twice at once.</summary>
 [CollectionDefinition("TypeScript")]
-public sealed class TypeScriptCollection : ICollectionFixture<TypeScriptToolchain>
-{
-}
+public sealed class TypeScriptCollection : ICollectionFixture<TypeScriptToolchain> { }
 
 /// <summary>Installs the TypeScript compiler once per test run and compiles the snapshots on demand.</summary>
-public sealed class TypeScriptToolchain
+public sealed class TypeScriptToolchain : IAsyncLifetime
 {
     private static readonly TimeSpan ToolTimeout = TimeSpan.FromMinutes(5);
 
-    public TypeScriptToolchain()
+    public ToolResult? CompileResult { get; private set; }
+
+    public ToolResult Compile =>
+        CompileResult ?? throw new InvalidOperationException("The toolchain is not initialized.");
+
+    public async ValueTask InitializeAsync()
     {
         string typeScript = TestPaths.TypeScriptDirectory;
 
         if (!File.Exists(CompilerPath))
         {
-            ToolResult install = Run("npm", ["ci", "--no-audit", "--no-fund"], typeScript);
+            ToolResult install = await RunAsync(
+                "npm",
+                ["ci", "--no-audit", "--no-fund"],
+                typeScript
+            );
             if (install.ExitCode != 0)
             {
-                throw new InvalidOperationException("npm ci failed in " + typeScript + ":" + Environment.NewLine + install.Output);
+                throw new InvalidOperationException(
+                    "npm ci failed in " + typeScript + ":" + Environment.NewLine + install.Output
+                );
             }
         }
 
-        Compile = new Lazy<ToolResult>(() => Run("node", [CompilerPath, "-p", "tsconfig.json"], typeScript));
+        CompileResult = await RunAsync(
+            "node",
+            [CompilerPath, "-p", "tsconfig.json"],
+            TestPaths.TypeScriptDirectory
+        );
     }
 
-    public Lazy<ToolResult> Compile { get; }
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>Type-checks standalone TypeScript with the same strictness as the snapshots.</summary>
-    public ToolResult Typecheck(string code)
+    public async Task<ToolResult> TypecheckAsync(string code)
     {
         string directory = Path.Combine(TestPaths.TypeScriptDirectory, "build", "lookup");
         Directory.CreateDirectory(directory);
         string file = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".ts");
-        File.WriteAllText(file, code);
+        await File.WriteAllTextAsync(file, code, TestContext.Current.CancellationToken);
 
         try
         {
-            return Run("node", [CompilerPath, file, "--noEmit", "--strict", "--target", "ES2022", "--lib", "ES2022,DOM"], TestPaths.TypeScriptDirectory);
+            return await RunAsync(
+                "node",
+                [
+                    CompilerPath,
+                    file,
+                    "--noEmit",
+                    "--strict",
+                    "--target",
+                    "ES2022",
+                    "--lib",
+                    "ES2022,DOM",
+                ],
+                TestPaths.TypeScriptDirectory
+            );
         }
         finally
         {
@@ -91,8 +119,13 @@ public sealed class TypeScriptToolchain
     /// <summary>
     /// Runs a command and captures its output. npm is a .cmd shim on Windows, which CreateProcess
     /// cannot start directly, so it goes through cmd.exe there.
+    /// Reading to the end after the process exits drains whatever is left in the pipes.
     /// </summary>
-    public static ToolResult Run(string tool, IReadOnlyList<string> arguments, string workingDirectory)
+    public static async Task<ToolResult> RunAsync(
+        string tool,
+        IReadOnlyList<string> arguments,
+        string workingDirectory
+    )
     {
         ProcessStartInfo startInfo = new()
         {
@@ -121,26 +154,40 @@ public sealed class TypeScriptToolchain
         Process process;
         try
         {
-            process = Process.Start(startInfo)!;
+            process = Process.Start(startInfo).ShouldNotBeNull();
         }
         catch (Win32Exception ex)
         {
-            throw new InvalidOperationException($"Could not start '{tool}'. These tests need node and npm on PATH (Node 22 or newer). {ex.Message}", ex);
+            throw new InvalidOperationException(
+                $"Could not start '{tool}'. These tests need node and npm on PATH (Node 22 or newer). {ex.Message}",
+                ex
+            );
         }
 
         using (process)
         {
-            Task<string> output = process.StandardOutput.ReadToEndAsync();
-            Task<string> error = process.StandardError.ReadToEndAsync();
+            using CancellationTokenSource timeout = CancellationTokenSource.CreateLinkedTokenSource(
+                TestContext.Current.CancellationToken
+            );
+            timeout.CancelAfter(ToolTimeout);
+            Task<string> output = process.StandardOutput.ReadToEndAsync(timeout.Token);
+            Task<string> error = process.StandardError.ReadToEndAsync(timeout.Token);
 
-            if (!process.WaitForExit(ToolTimeout))
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+                when (!TestContext.Current.CancellationToken.IsCancellationRequested)
             {
                 process.Kill(entireProcessTree: true);
-                throw new TimeoutException($"'{tool} {string.Join(' ', arguments)}' did not finish within {ToolTimeout.TotalMinutes} minutes.");
+                throw new TimeoutException(
+                    $"'{tool} {string.Join(' ', arguments)}' did not finish within {ToolTimeout.TotalMinutes} minutes.",
+                    new OperationCanceledException(timeout.Token)
+                );
             }
 
-            // Reading to the end after the process exits drains whatever is left in the pipes.
-            return new ToolResult(process.ExitCode, output.Result + error.Result);
+            return new ToolResult(process.ExitCode, await output + await error);
         }
     }
 }

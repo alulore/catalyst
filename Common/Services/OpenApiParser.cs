@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
+using Auxil.Common;
 using Catalyst.Common.Models;
 using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
 using Microsoft.OpenApi.YamlReader;
 using SharpYaml.Serialization;
-using Auxil.Common;
 
 namespace Catalyst.Common.Services;
 
@@ -30,22 +30,32 @@ internal static class OpenApiParser
         try
         {
             string json = IsYaml(content, sourceName) ? ConvertYamlToJson(content) : content;
-            ReadResult result = OpenApiModelFactory.Parse(PreserveNullableComposition(json), "json", new OpenApiReaderSettings());
+            ReadResult result = OpenApiModelFactory.Parse(
+                PreserveNullableComposition(json),
+                "json",
+                new OpenApiReaderSettings()
+            );
 
             if (result.Document is null || result.Diagnostic is null)
             {
-                return Result<OpenApiParseResult>.Error("Failed to parse OpenAPI document: " + DescribeFailure(result.Diagnostic));
+                return Result<OpenApiParseResult>.Error(
+                    "Failed to parse OpenAPI document: " + DescribeFailure(result.Diagnostic)
+                );
             }
 
-            return Result<OpenApiParseResult>.Ok(new OpenApiParseResult
-            {
-                Document = result.Document,
-                Diagnostic = result.Diagnostic,
-            });
+            return Result<OpenApiParseResult>.Ok(
+                new OpenApiParseResult
+                {
+                    Document = result.Document,
+                    Diagnostic = result.Diagnostic,
+                }
+            );
         }
         catch (Exception ex)
         {
-            return Result<OpenApiParseResult>.Error($"Failed to parse OpenAPI document: {ex.Message}");
+            return Result<OpenApiParseResult>.Error(
+                $"Failed to parse OpenAPI document: {ex.Message}"
+            );
         }
     }
 
@@ -62,7 +72,10 @@ internal static class OpenApiParser
             .Take(MaxReportedErrors)
             .Select(e => string.IsNullOrEmpty(e.Pointer) ? e.Message : $"{e.Pointer}: {e.Message}")
             .ToList();
-        string more = errors.Count > MaxReportedErrors ? $" (and {errors.Count - MaxReportedErrors} more)" : string.Empty;
+        string more =
+            errors.Count > MaxReportedErrors
+                ? $" (and {errors.Count - MaxReportedErrors} more)"
+                : string.Empty;
 
         return string.Join("; ", shown) + more;
     }
@@ -73,7 +86,10 @@ internal static class OpenApiParser
         string? name = sourceName?.Split('?', '#')[0];
         string extension = string.IsNullOrEmpty(name) ? string.Empty : Path.GetExtension(name);
 
-        if (extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) || extension.Equals(".yml", StringComparison.OrdinalIgnoreCase))
+        if (
+            extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase)
+            || extension.Equals(".yml", StringComparison.OrdinalIgnoreCase)
+        )
         {
             return true;
         }
@@ -87,9 +103,10 @@ internal static class OpenApiParser
         return trimmed.Length > 0 && trimmed[0] != '{';
     }
 
+    /// <summary>The converter refuses documents whose aliases expand to an unreasonable number of nodes.</summary>
     private static string ConvertYamlToJson(string content)
     {
-        YamlStream stream = new();
+        YamlStream stream = [];
         stream.Load(new StringReader(content));
 
         if (stream.Documents.Count == 0)
@@ -97,22 +114,24 @@ internal static class OpenApiParser
             throw new FormatException("the YAML document is empty.");
         }
 
-        // The converter refuses documents whose aliases expand to an unreasonable number of nodes.
         return YamlConverter.ToJsonNode(stream.Documents[0]).ToJsonString();
     }
 
     /// <summary>
     /// For OpenAPI 3.0 documents, marks every untyped allOf/anyOf/oneOf schema that says "nullable: true"
-    /// with <see cref="NullableExtension"/>. Content that is not a 3.0 JSON document is returned as is.
+    /// with <see cref="NullableExtension"/>. Content that is not a 3.0 JSON document is returned as is, and so is
+    /// content that is not valid JSON: the OpenAPI reader reports that.
     /// </summary>
     internal static string PreserveNullableComposition(string content)
     {
         try
         {
             JsonNode? root = JsonNode.Parse(content);
-            if (root is not JsonObject rootObject
+            if (
+                root is not JsonObject rootObject
                 || rootObject["openapi"]?.GetValue<string>() is not { } version
-                || !version.StartsWith("3.0", StringComparison.Ordinal))
+                || !version.StartsWith("3.0", StringComparison.Ordinal)
+            )
             {
                 return content;
             }
@@ -124,9 +143,14 @@ internal static class OpenApiParser
 
             return root.ToJsonString();
         }
-        catch (Exception ex) when (ex is System.Text.Json.JsonException or ArgumentException or InvalidOperationException or FormatException)
+        catch (Exception ex)
+            when (ex
+                    is System.Text.Json.JsonException
+                        or ArgumentException
+                        or InvalidOperationException
+                        or FormatException
+            )
         {
-            // Not valid JSON: leave it to the OpenAPI reader to report.
             return content;
         }
     }
@@ -137,11 +161,15 @@ internal static class OpenApiParser
 
         if (node is JsonObject obj)
         {
-            if (obj["nullable"] is JsonValue { } nullable
+            if (
+                obj["nullable"] is JsonValue { } nullable
                 && nullable.TryGetValue(out bool isNullable)
                 && isNullable
                 && !obj.ContainsKey("type")
-                && (obj.ContainsKey("allOf") || obj.ContainsKey("anyOf") || obj.ContainsKey("oneOf")))
+                && (
+                    obj.ContainsKey("allOf") || obj.ContainsKey("anyOf") || obj.ContainsKey("oneOf")
+                )
+            )
             {
                 obj[NullableExtension] = true;
                 changed = true;

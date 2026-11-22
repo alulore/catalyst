@@ -15,7 +15,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -43,7 +43,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Configure private feed
         run: dotnet nuget update source github-auxil --username USERNAME --password ${{ secrets.AUXIL_PACKAGES_TOKEN }} --store-password-in-clear-text
@@ -72,7 +72,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Configure private feed
         run: dotnet nuget update source github-auxil --username USERNAME --password ${{ secrets.AUXIL_PACKAGES_TOKEN }} --store-password-in-clear-text

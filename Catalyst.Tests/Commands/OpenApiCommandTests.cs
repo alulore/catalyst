@@ -1,34 +1,32 @@
-using Catalyst.Common.Configuration;
-using Catalyst.Commands.Gen;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Catalyst.Commands.Gen;
+using Catalyst.Common.Configuration;
+using Shouldly;
 using Spectre.Console;
-using Spectre.Console.Cli;
 
 namespace Catalyst.Tests.Commands;
 
-// The tests that run the command replace the static AnsiConsole, so they must not overlap.
+/// <summary>The tests that run the command replace the static AnsiConsole, so they must not overlap.</summary>
 [Collection("AnsiConsole")]
 public class OpenApiCommandTests
 {
-    private static CatalystConfig ConfigWith(params string[] skipPaths) => new CatalystConfig
-    {
-        Gen = new GenConfig
+    private static CatalystConfig ConfigWith(params string[] skipPaths) =>
+        new()
         {
-            OpenApi = new OpenApiGenConfig
+            Gen = new GenConfig
             {
-                SkipPaths = skipPaths.ToList()
-            }
-        }
-    };
+                OpenApi = new OpenApiGenConfig { SkipPaths = skipPaths.ToList() },
+            },
+        };
 
     [Fact]
     public void Insecure_DefaultsToFalse_SoCertificateValidationStaysOn()
     {
         OpenApiCommand.Settings settings = new();
 
-        Assert.False(settings.Insecure);
+        settings.Insecure.ShouldBeFalse();
     }
 
     [Fact]
@@ -36,7 +34,7 @@ public class OpenApiCommandTests
     {
         List<string> result = OpenApiCommand.ResolveSkipPaths(["/cli/"], ConfigWith("/cfg/"));
 
-        Assert.Equal(["/cli/"], result);
+        result.ShouldBe(["/cli/"]);
     }
 
     [Fact]
@@ -44,7 +42,7 @@ public class OpenApiCommandTests
     {
         List<string> result = OpenApiCommand.ResolveSkipPaths(null, ConfigWith("/cfg/"));
 
-        Assert.Equal(["/cfg/"], result);
+        result.ShouldBe(["/cfg/"]);
     }
 
     [Fact]
@@ -52,7 +50,7 @@ public class OpenApiCommandTests
     {
         List<string> result = OpenApiCommand.ResolveSkipPaths(null, null);
 
-        Assert.Empty(result);
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -60,7 +58,7 @@ public class OpenApiCommandTests
     {
         List<string> result = OpenApiCommand.ResolveSkipPaths(["/a/, /b/"], null);
 
-        Assert.Equal(["/a/", "/b/"], result);
+        result.ShouldBe(["/a/", "/b/"]);
     }
 
     [Fact]
@@ -68,25 +66,31 @@ public class OpenApiCommandTests
     {
         List<string> result = OpenApiCommand.ResolveSkipPaths(["/a/", "/b/"], null);
 
-        Assert.Equal(["/a/", "/b/"], result);
+        result.ShouldBe(["/a/", "/b/"]);
     }
 
     [Fact]
     public void ResolveOutputPath_UsesClassName_WhenOutputEndsWithSeparator()
     {
         char separator = Path.DirectorySeparatorChar;
-        string result = OpenApiCommand.ResolveOutputPath($"src{separator}external-apis{separator}", "CommunicationApi");
+        string result = OpenApiCommand.ResolveOutputPath(
+            $"src{separator}external-apis{separator}",
+            "CommunicationApi"
+        );
 
-        Assert.Equal(Path.Combine($"src{separator}external-apis", "CommunicationApi.ts"), result);
+        result.ShouldBe(Path.Combine($"src{separator}external-apis", "CommunicationApi.ts"));
     }
 
     [Fact]
     public void ResolveOutputPath_DefaultsToApi_WhenOutputIsDirectoryAndNoClassName()
     {
         char separator = Path.DirectorySeparatorChar;
-        string result = OpenApiCommand.ResolveOutputPath($"src{separator}external-apis{separator}", null);
+        string result = OpenApiCommand.ResolveOutputPath(
+            $"src{separator}external-apis{separator}",
+            null
+        );
 
-        Assert.Equal(Path.Combine($"src{separator}external-apis", "api.ts"), result);
+        result.ShouldBe(Path.Combine($"src{separator}external-apis", "api.ts"));
     }
 
     [Fact]
@@ -98,7 +102,7 @@ public class OpenApiCommandTests
         {
             string result = OpenApiCommand.ResolveOutputPath(dir, "CommunicationApi");
 
-            Assert.Equal(Path.Combine(dir, "CommunicationApi.ts"), result);
+            result.ShouldBe(Path.Combine(dir, "CommunicationApi.ts"));
         }
         finally
         {
@@ -109,49 +113,69 @@ public class OpenApiCommandTests
     [Fact]
     public void ResolveOutputPath_PassesThroughPlainFilePath()
     {
-        string result = OpenApiCommand.ResolveOutputPath("src\\external-apis\\api.ts", "CommunicationApi");
+        string result = OpenApiCommand.ResolveOutputPath(
+            "src\\external-apis\\api.ts",
+            "CommunicationApi"
+        );
 
-        Assert.Equal("src\\external-apis\\api.ts", result);
+        result.ShouldBe("src\\external-apis\\api.ts");
     }
 
+    /// <summary>'/' is invalid in file names on both Windows and Unix.</summary>
     [Fact]
     public void ResolveOutputPath_SanitizesInvalidFileNameCharacters()
     {
         char separator = Path.DirectorySeparatorChar;
 
-        // '/' is invalid in file names on both Windows and Unix.
         string result = OpenApiCommand.ResolveOutputPath($"out{separator}", "My/Api");
 
-        Assert.Equal(Path.Combine("out", "My_Api.ts"), result);
+        result.ShouldBe(Path.Combine("out", "My_Api.ts"));
     }
 
     [Fact]
     public void ResolveOutputPath_ReturnsEmpty_WhenOutputIsBlank()
     {
-        Assert.Equal(string.Empty, OpenApiCommand.ResolveOutputPath("", null));
-        Assert.Equal(string.Empty, OpenApiCommand.ResolveOutputPath("   ", null));
+        OpenApiCommand.ResolveOutputPath("", null).ShouldBe(string.Empty);
+        OpenApiCommand.ResolveOutputPath("   ", null).ShouldBe(string.Empty);
     }
 
     [Fact]
     public void Validate_AllowsMissingSource_ForConfigDrivenGeneration()
     {
-        Assert.True(new OpenApiCommand.Settings().Validate().Successful);
+        new OpenApiCommand.Settings().Validate().Successful.ShouldBeTrue();
     }
 
     [Fact]
     public void Validate_RejectsSingleClientOptions_WithoutSource()
     {
-        Assert.False(new OpenApiCommand.Settings { Language = "typescript", Output = "api.ts" }.Validate().Successful);
-        Assert.False(new OpenApiCommand.Settings { ClassName = "Api" }.Validate().Successful);
-        Assert.False(new OpenApiCommand.Settings { SkipPaths = ["/x/"] }.Validate().Successful);
-        Assert.False(new OpenApiCommand.Settings { Insecure = true }.Validate().Successful);
+        new OpenApiCommand.Settings { Language = "typescript", Output = "api.ts" }
+            .Validate()
+            .Successful.ShouldBeFalse();
+        new OpenApiCommand.Settings { ClassName = "Api" }
+            .Validate()
+            .Successful.ShouldBeFalse();
+        new OpenApiCommand.Settings { SkipPaths = ["/x/"] }
+            .Validate()
+            .Successful.ShouldBeFalse();
+        new OpenApiCommand.Settings { Insecure = true }
+            .Validate()
+            .Successful.ShouldBeFalse();
     }
 
     [Fact]
     public void Validate_RequiresOutput_WhenLanguageIsGivenWithSource()
     {
-        Assert.False(new OpenApiCommand.Settings { Source = "spec.json", Language = "typescript" }.Validate().Successful);
-        Assert.True(new OpenApiCommand.Settings { Source = "spec.json", Language = "typescript", Output = "api.ts" }.Validate().Successful);
+        new OpenApiCommand.Settings { Source = "spec.json", Language = "typescript" }
+            .Validate()
+            .Successful.ShouldBeFalse();
+        new OpenApiCommand.Settings
+        {
+            Source = "spec.json",
+            Language = "typescript",
+            Output = "api.ts",
+        }
+            .Validate()
+            .Successful.ShouldBeTrue();
     }
 
     [Fact]
@@ -159,29 +183,38 @@ public class OpenApiCommandTests
     {
         string result = OpenApiCommand.ResolveOutputPath(Path.Combine("src", "clients"), "Api");
 
-        Assert.Equal(Path.Combine("src", "clients", "Api.ts"), result);
+        result.ShouldBe(Path.Combine("src", "clients", "Api.ts"));
     }
 
     [Fact]
     public void EffectiveLanguage_DefaultsToTypeScript_WhenOutputIsGiven()
     {
-        Assert.Equal("typescript", new OpenApiCommand.Settings { Source = "spec.json", Output = "api.ts" }.EffectiveLanguage);
-        Assert.Equal("typescript", new OpenApiCommand.Settings { Source = "spec.json", Language = "typescript", Output = "api.ts" }.EffectiveLanguage);
-        Assert.Null(new OpenApiCommand.Settings { Source = "spec.json" }.EffectiveLanguage);
+        new OpenApiCommand.Settings
+        {
+            Source = "spec.json",
+            Output = "api.ts",
+        }.EffectiveLanguage.ShouldBe("typescript");
+        new OpenApiCommand.Settings
+        {
+            Source = "spec.json",
+            Language = "typescript",
+            Output = "api.ts",
+        }.EffectiveLanguage.ShouldBe("typescript");
+        new OpenApiCommand.Settings { Source = "spec.json" }.EffectiveLanguage.ShouldBeNull();
     }
 
+    /// <summary>"[1]" is a Spectre style tag in markup; the error must be printed as text, not parsed.</summary>
     [Fact]
     public void Run_ReportsMissingSourceFile_ToStderr_EvenWhenItsNameLooksLikeMarkup()
     {
-        // "[1]" is a Spectre style tag in markup; the error must be printed as text, not parsed.
         string source = Path.Combine(Path.GetTempPath(), "catalyst-missing", "api[1].json");
 
         CommandRun run = RunCommand("--source", source);
 
-        Assert.Equal(1, run.ExitCode);
-        Assert.Contains("File not found", run.Error);
-        Assert.Contains("api[1].json", run.Error);
-        Assert.DoesNotContain("File not found", run.Output);
+        run.ExitCode.ShouldBe(1);
+        run.Error.ShouldContain("File not found", Case.Sensitive);
+        run.Error.ShouldContain("api[1].json", Case.Sensitive);
+        run.Output.ShouldNotContain("File not found", Case.Sensitive);
     }
 
     [Fact]
@@ -195,9 +228,9 @@ public class OpenApiCommandTests
 
             CommandRun run = RunCommand("--source", spec);
 
-            Assert.Equal(1, run.ExitCode);
-            Assert.Contains("Failed to parse OpenAPI document", run.Error);
-            Assert.DoesNotContain("empty result", run.Error);
+            run.ExitCode.ShouldBe(1);
+            run.Error.ShouldContain("Failed to parse OpenAPI document", Case.Sensitive);
+            run.Error.ShouldNotContain("empty result", Case.Sensitive);
         }
         finally
         {
@@ -205,6 +238,7 @@ public class OpenApiCommandTests
         }
     }
 
+    /// <summary>An identical regeneration must not rewrite the file (no timestamp churn).</summary>
     [Fact]
     public void Run_GeneratesTypeScript_WhenOnlyOutputIsGiven_AndLeavesUnchangedFilesAlone()
     {
@@ -217,19 +251,18 @@ public class OpenApiCommandTests
 
             CommandRun first = RunCommand("--source", spec, "--output", output);
 
-            Assert.Equal(0, first.ExitCode);
-            Assert.Contains("TypeScript generated", first.Output);
-            Assert.True(File.Exists(output));
+            first.ExitCode.ShouldBe(0);
+            first.Output.ShouldContain("TypeScript generated", Case.Sensitive);
+            File.Exists(output).ShouldBeTrue();
 
-            // An identical regeneration must not rewrite the file (no timestamp churn).
             DateTime old = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
             File.SetLastWriteTimeUtc(output, old);
 
             CommandRun second = RunCommand("--source", spec, "--output", output);
 
-            Assert.Equal(0, second.ExitCode);
-            Assert.Contains("Unchanged since the last generation", second.Output);
-            Assert.Equal(old, File.GetLastWriteTimeUtc(output));
+            second.ExitCode.ShouldBe(0);
+            second.Output.ShouldContain("Unchanged since the last generation", Case.Sensitive);
+            File.GetLastWriteTimeUtc(output).ShouldBe(old);
         }
         finally
         {
@@ -240,43 +273,44 @@ public class OpenApiCommandTests
     /// <summary>
     /// The Syncfully Workbench finds the generated file with this exact pattern (electron/main/catalyst.ts).
     /// The line must match, and carry nothing but the path, whether or not the file was rewritten.
+    /// JavaScript ends a line at CR for $, .NET does not: compare with LF line ends.
+    /// Longer than 200 characters (but under Windows MAX_PATH) and written with mixed separators: the line must not wrap, and the path must come back normalised. Segments are added until the full path passes 200 characters, whatever the length of the temp directory.
     /// </summary>
     [Fact]
     public void Run_SuccessLine_MatchesTheWorkbenchContract_WhenWrittenAndWhenUnchanged()
     {
-        Regex workbench = new(@"^[ \t]*TypeScript generated:[ \t]*(.+?)[ \t]*$", RegexOptions.Multiline);
+        Regex workbench = new(
+            @"^[ \t]*TypeScript generated:[ \t]*(?<path>.+?)[ \t]*$",
+            RegexOptions.Multiline
+        );
         string dir = CreateTempDirectory();
         try
         {
             string spec = Path.Combine(dir, "spec.json");
-
-            // Longer than 200 characters (but under Windows MAX_PATH) and written with mixed separators:
-            // the line must not wrap, and the path must come back normalised.
-            // Segments are added until the full path passes 200 characters, whatever the length of the temp directory.
-            const string segment = "nested-directory-segment";
-            int segments = 1;
-            while (Path.GetFullPath($"{dir}/{string.Join('/', Enumerable.Repeat(segment, segments))}{Path.DirectorySeparatorChar}api.ts").Length <= 200)
-            {
-                segments++;
-            }
-
-            string nested = string.Join('/', Enumerable.Repeat(segment, segments));
+            string nested = NestedDirectoryPast(dir, 200);
             string output = Path.GetFullPath($"{dir}/{nested}{Path.DirectorySeparatorChar}api.ts");
-            Assert.InRange(output.Length, 201, 259);
+            output.Length.ShouldBeInRange(201, 259);
             File.Copy(TestPaths.SpecPath("minimal"), spec);
 
-            string written = RunCommand(80, "--source", spec, "--output", $"{dir}/{nested}{Path.DirectorySeparatorChar}api.ts").Output;
-            string unchanged = RunCommand(80, "--source", spec, "--output", $"{dir}/{nested}{Path.DirectorySeparatorChar}api.ts").Output;
+            string written = RunCommand(
+                80,
+                "--source",
+                spec,
+                "--output",
+                $"{dir}/{nested}{Path.DirectorySeparatorChar}api.ts"
+            ).Output;
+            string unchanged = RunCommand(
+                80,
+                "--source",
+                spec,
+                "--output",
+                $"{dir}/{nested}{Path.DirectorySeparatorChar}api.ts"
+            ).Output;
 
-            Assert.DoesNotContain("Unchanged since", written);
-            Assert.Contains("Unchanged since", unchanged);
-            foreach (string stdout in new[] { written, unchanged })
-            {
-                // JavaScript ends a line at CR for $, .NET does not: compare with LF line ends.
-                Match match = workbench.Match(stdout.Replace("\r\n", "\n"));
-                Assert.True(match.Success, stdout);
-                Assert.Equal(output, match.Groups[1].Value);
-            }
+            written.ShouldNotContain("Unchanged since", Case.Sensitive);
+            unchanged.ShouldContain("Unchanged since", Case.Sensitive);
+            AssertWorkbenchLine(workbench, written, output);
+            AssertWorkbenchLine(workbench, unchanged, output);
         }
         finally
         {
@@ -298,22 +332,36 @@ public class OpenApiCommandTests
             string output = Path.Combine(dir, "api.ts");
             File.Copy(TestPaths.SpecPath("edge-cases"), spec);
 
-            CommandRun generated = CommandHarness.Run(1000, ansi: true, ["gen", "openapi", "--source", spec, "--output", output]);
+            CommandRun generated = CommandHarness.Run(
+                1000,
+                ansi: true,
+                ["gen", "openapi", "--source", spec, "--output", output]
+            );
             File.WriteAllText(output, "// old");
-            CommandRun stale = CommandHarness.Run(1000, ansi: true, ["gen", "openapi", "--source", spec, "--output", output, "--check"]);
-            CommandRun failed = CommandHarness.Run(1000, ansi: true, ["gen", "openapi", "--source", Path.Combine(dir, "missing.json")]);
+            CommandRun stale = CommandHarness.Run(
+                1000,
+                ansi: true,
+                ["gen", "openapi", "--source", spec, "--output", output, "--check"]
+            );
+            CommandRun failed = CommandHarness.Run(
+                1000,
+                ansi: true,
+                ["gen", "openapi", "--source", Path.Combine(dir, "missing.json")]
+            );
 
-            Assert.Contains("TypeScript generated: " + output, generated.Output);
-            Assert.Contains("Warning: ", generated.Error);
-            Assert.Contains("Out of date: " + output, stale.Output);
-            Assert.Contains("Error: File not found", failed.Error);
-            foreach (string text in new[] { generated.Output, generated.Error, stale.Output, failed.Error })
-            {
-                foreach (string line in text.Split('\n').Where(l => l.Contains("TypeScript generated:") || l.Contains("Out of date:") || l.Contains("Warning:") || l.Contains("Error:")))
-                {
-                    Assert.DoesNotContain('\u001b', line);
-                }
-            }
+            generated.Output.ShouldContain("TypeScript generated: " + output, Case.Sensitive);
+            generated.Error.ShouldContain("Warning: ", Case.Sensitive);
+            stale.Output.ShouldContain("Out of date: " + output, Case.Sensitive);
+            failed.Error.ShouldContain("Error: File not found", Case.Sensitive);
+            new[] { generated.Output, generated.Error, stale.Output, failed.Error }
+                .SelectMany(text => text.Split('\n'))
+                .Where(line =>
+                    line.Contains("TypeScript generated:", StringComparison.Ordinal)
+                    || line.Contains("Out of date:", StringComparison.Ordinal)
+                    || line.Contains("Warning:", StringComparison.Ordinal)
+                    || line.Contains("Error:", StringComparison.Ordinal)
+                )
+                .ShouldAllBe(line => !line.Contains('\u001b', StringComparison.Ordinal));
         }
         finally
         {
@@ -332,10 +380,10 @@ public class OpenApiCommandTests
 
             CommandRun run = RunCommand("--source", spec, "--output", Path.Combine(dir, "api.ts"));
 
-            Assert.Equal(0, run.ExitCode);
-            Assert.Contains("TypeScript generated", run.Output);
-            Assert.DoesNotContain("Warning:", run.Output);
-            Assert.Contains("Warning:", run.Error);
+            run.ExitCode.ShouldBe(0);
+            run.Output.ShouldContain("TypeScript generated", Case.Sensitive);
+            run.Output.ShouldNotContain("Warning:", Case.Sensitive);
+            run.Error.ShouldContain("Warning:", Case.Sensitive);
         }
         finally
         {
@@ -350,21 +398,34 @@ public class OpenApiCommandTests
         await cancellation.CancelAsync();
 
         (int exitCode, string error) = await CapturingErrorAsync(() =>
-            OpenApiCommand.RunAsync(new OpenApiCommand.Settings { Source = "http://127.0.0.1:1/openapi.json" }, cancellation.Token));
+            OpenApiCommand.RunAsync(
+                new OpenApiCommand.Settings { Source = "http://127.0.0.1:1/openapi.json" },
+                cancellation.Token
+            )
+        );
 
-        Assert.Equal(130, exitCode);
-        Assert.Contains("Cancelled.", error);
-        Assert.DoesNotContain("timed out", error);
+        exitCode.ShouldBe(130);
+        error.ShouldContain("Cancelled.", Case.Sensitive);
+        error.ShouldNotContain("timed out", Case.Sensitive);
     }
-
-    // ---- --check ----
 
     [Fact]
     public void Check_RejectsValidationOnlyMode()
     {
-        Assert.False(new OpenApiCommand.Settings { Source = "spec.json", Check = true }.Validate().Successful);
-        Assert.True(new OpenApiCommand.Settings { Source = "spec.json", Check = true, Output = "api.ts" }.Validate().Successful);
-        Assert.True(new OpenApiCommand.Settings { Check = true }.Validate().Successful);
+        new OpenApiCommand.Settings { Source = "spec.json", Check = true }
+            .Validate()
+            .Successful.ShouldBeFalse();
+        new OpenApiCommand.Settings
+        {
+            Source = "spec.json",
+            Check = true,
+            Output = "api.ts",
+        }
+            .Validate()
+            .Successful.ShouldBeTrue();
+        new OpenApiCommand.Settings { Check = true }
+            .Validate()
+            .Successful.ShouldBeTrue();
     }
 
     [Fact]
@@ -380,10 +441,10 @@ public class OpenApiCommandTests
 
             CommandRun run = RunCommand("--source", spec, "--output", output, "--check");
 
-            Assert.Equal(0, run.ExitCode);
-            Assert.Contains("Up to date: " + output, run.Output);
-            Assert.Contains("1 client(s) up to date.", run.Output);
-            Assert.Equal(string.Empty, run.Error);
+            run.ExitCode.ShouldBe(0);
+            run.Output.ShouldContain("Up to date: " + output, Case.Sensitive);
+            run.Output.ShouldContain("1 client(s) up to date.", Case.Sensitive);
+            run.Error.ShouldBe(string.Empty);
         }
         finally
         {
@@ -406,10 +467,10 @@ public class OpenApiCommandTests
 
             CommandRun run = RunCommand("--source", spec, "--output", output, "--check");
 
-            Assert.Equal(1, run.ExitCode);
-            Assert.Contains("Out of date: " + output, run.Output);
-            Assert.Equal("// hand edited", File.ReadAllText(output));
-            Assert.Equal(old, File.GetLastWriteTimeUtc(output));
+            run.ExitCode.ShouldBe(1);
+            run.Output.ShouldContain("Out of date: " + output, Case.Sensitive);
+            File.ReadAllText(output).ShouldBe("// hand edited");
+            File.GetLastWriteTimeUtc(output).ShouldBe(old);
         }
         finally
         {
@@ -429,9 +490,9 @@ public class OpenApiCommandTests
 
             CommandRun run = RunCommand("--source", spec, "--output", output, "--check");
 
-            Assert.Equal(1, run.ExitCode);
-            Assert.Contains("Missing: " + output, run.Output);
-            Assert.False(Directory.Exists(Path.Combine(dir, "not-yet")));
+            run.ExitCode.ShouldBe(1);
+            run.Output.ShouldContain("Missing: " + output, Case.Sensitive);
+            Directory.Exists(Path.Combine(dir, "not-yet")).ShouldBeFalse();
         }
         finally
         {
@@ -439,31 +500,34 @@ public class OpenApiCommandTests
         }
     }
 
-    // ---- --json ----
-
+    /// <summary>Parsing with unmapped members disallowed means the README shape and the output cannot drift apart silently.</summary>
     [Fact]
     public void Json_Validate_DescribesTheSpec_InTheDocumentedShape()
     {
         CommandRun run = RunCommand("--source", TestPaths.SpecPath("minimal"), "--json");
 
-        // Parsing with unmapped members disallowed means the README shape and the output cannot drift apart silently.
         JsonReport report = ParseReport(run);
 
-        Assert.Equal(0, run.ExitCode);
-        Assert.Equal(1, report.SchemaVersion);
-        Assert.Equal("gen openapi", report.Command);
-        Assert.Equal("validate", report.Mode);
-        Assert.True(report.Success);
-        Assert.Equal(0, report.ExitCode);
-        Assert.Empty(report.Results);
-        Assert.Null(report.Error);
-        Assert.Equal("Minimal API", report.Spec!.Title);
-        Assert.Equal("1.0.0", report.Spec.Version);
-        Assert.Equal("3.0", report.Spec.Openapi);
-        Assert.Equal(10, report.Spec.PathCount);
-        Assert.Equal(1, report.Spec.SchemaCount);
-        Assert.Contains(report.Spec.Operations, o => o.Method == "GET" && o.Path == "/widgets" && o.Summary == "List widgets" && o.OperationId == null);
-        Assert.Empty(report.Diagnostics!);
+        run.ExitCode.ShouldBe(0);
+        report.SchemaVersion.ShouldBe(1);
+        report.Command.ShouldBe("gen openapi");
+        report.Mode.ShouldBe("validate");
+        report.Success.ShouldBeTrue();
+        report.ExitCode.ShouldBe(0);
+        report.Results.ShouldBeEmpty();
+        report.Error.ShouldBeNull();
+        report.Spec.ShouldNotBeNull().Title.ShouldBe("Minimal API");
+        report.Spec.Version.ShouldBe("1.0.0");
+        report.Spec.Openapi.ShouldBe("3.0");
+        report.Spec.PathCount.ShouldBe(10);
+        report.Spec.SchemaCount.ShouldBe(1);
+        report.Spec.Operations.ShouldContain(o =>
+            o.Method == "GET"
+            && o.Path == "/widgets"
+            && o.Summary == "List widgets"
+            && o.OperationId == null
+        );
+        (report.Diagnostics.ShouldNotBeNull()).ShouldBeEmpty();
     }
 
     [Fact]
@@ -477,19 +541,23 @@ public class OpenApiCommandTests
             File.Copy(TestPaths.SpecPath("edge-cases"), spec);
             string messy = dir + "/out/../out/api.ts";
 
-            JsonReport first = ParseReport(RunCommand("--source", spec, "--output", messy, "--json"));
-            JsonReport second = ParseReport(RunCommand("--source", spec, "--output", messy, "--json"));
+            JsonReport first = ParseReport(
+                RunCommand("--source", spec, "--output", messy, "--json")
+            );
+            JsonReport second = ParseReport(
+                RunCommand("--source", spec, "--output", messy, "--json")
+            );
 
-            Assert.Equal("generate", first.Mode);
-            Assert.True(first.Success);
-            JsonResult result = Assert.Single(first.Results);
-            Assert.Null(result.Name);
-            Assert.Equal(spec, result.Source);
-            Assert.Equal(output, result.OutputPath);
-            Assert.Equal("written", result.Status);
-            Assert.Contains(result.Warnings, w => w.Code == "PATH_PARAMETER_MISMATCH");
-            Assert.Null(result.Error);
-            Assert.Equal("unchanged", Assert.Single(second.Results).Status);
+            first.Mode.ShouldBe("generate");
+            first.Success.ShouldBeTrue();
+            JsonResult result = first.Results.ShouldHaveSingleItem();
+            result.Name.ShouldBeNull();
+            result.Source.ShouldBe(spec);
+            result.OutputPath.ShouldBe(output);
+            result.Status.ShouldBe("written");
+            result.Warnings.ShouldContain(w => w.Code == "PATH_PARAMETER_MISMATCH");
+            result.Error.ShouldBeNull();
+            second.Results.ShouldHaveSingleItem().Status.ShouldBe("unchanged");
         }
         finally
         {
@@ -511,12 +579,12 @@ public class OpenApiCommandTests
             CommandRun run = RunCommand("--source", spec, "--output", output, "--check", "--json");
             JsonReport report = ParseReport(run);
 
-            Assert.Equal(1, run.ExitCode);
-            Assert.Equal("check", report.Mode);
-            Assert.False(report.Success);
-            Assert.Equal(1, report.ExitCode);
-            Assert.Equal("stale", Assert.Single(report.Results).Status);
-            Assert.Null(report.Error);
+            run.ExitCode.ShouldBe(1);
+            report.Mode.ShouldBe("check");
+            report.Success.ShouldBeFalse();
+            report.ExitCode.ShouldBe(1);
+            report.Results.ShouldHaveSingleItem().Status.ShouldBe("stale");
+            report.Error.ShouldBeNull();
         }
         finally
         {
@@ -532,26 +600,29 @@ public class OpenApiCommandTests
         try
         {
             File.Copy(TestPaths.SpecPath("minimal"), Path.Combine(dir, "spec.json"));
-            File.WriteAllText(Path.Combine(dir, "catalyst.config.json"), """
+            File.WriteAllText(
+                Path.Combine(dir, "catalyst.config.json"),
+                """
                 { "gen": { "openapi": { "clients": [
                   { "name": "Works", "source": "spec.json", "output": "out" },
                   { "name": "NoSource", "output": "out" },
                   { "name": "Missing", "source": "gone.json", "output": "out" }
                 ] } } }
-                """);
+                """
+            );
             Directory.SetCurrentDirectory(dir);
 
             CommandRun run = RunCommand("--json");
             JsonReport report = ParseReport(run);
 
-            Assert.Equal(1, run.ExitCode);
-            Assert.Equal("generate", report.Mode);
-            Assert.False(report.Success);
-            Assert.Equal(["written", "failed", "failed"], report.Results.Select(r => r.Status));
-            Assert.Equal(Path.Combine(dir, "out", "Works.ts"), report.Results[0].OutputPath);
-            Assert.Equal("CLIENT_INVALID", report.Results[1].Error!.Code);
-            Assert.Equal("SOURCE_NOT_FOUND", report.Results[2].Error!.Code);
-            Assert.Null(report.Error);
+            run.ExitCode.ShouldBe(1);
+            report.Mode.ShouldBe("generate");
+            report.Success.ShouldBeFalse();
+            report.Results.Select(r => r.Status).ShouldBe(["written", "failed", "failed"]);
+            report.Results[0].OutputPath.ShouldBe(Path.Combine(dir, "out", "Works.ts"));
+            report.Results[1].Error.ShouldNotBeNull().Code.ShouldBe("CLIENT_INVALID");
+            report.Results[2].Error.ShouldNotBeNull().Code.ShouldBe("SOURCE_NOT_FOUND");
+            report.Error.ShouldBeNull();
         }
         finally
         {
@@ -568,10 +639,10 @@ public class OpenApiCommandTests
         CommandRun run = RunCommand("--source", source, "--json");
         JsonReport report = ParseReport(run);
 
-        Assert.Equal(1, run.ExitCode);
-        Assert.False(report.Success);
-        Assert.Equal("SOURCE_NOT_FOUND", report.Error!.Code);
-        Assert.Contains("api[1].json", report.Error.Message);
+        run.ExitCode.ShouldBe(1);
+        report.Success.ShouldBeFalse();
+        report.Error.ShouldNotBeNull().Code.ShouldBe("SOURCE_NOT_FOUND");
+        report.Error.Message.ShouldContain("api[1].json", Case.Sensitive);
     }
 
     [Fact]
@@ -580,22 +651,28 @@ public class OpenApiCommandTests
         CommandRun run = RunCommand("--output", "api.ts", "--json");
         JsonReport report = ParseReport(run);
 
-        Assert.Equal(2, run.ExitCode);
-        Assert.Equal("USAGE", report.Error!.Code);
-        Assert.Equal(2, report.ExitCode);
-        Assert.False(report.Success);
+        run.ExitCode.ShouldBe(2);
+        report.Error.ShouldNotBeNull().Code.ShouldBe("USAGE");
+        report.ExitCode.ShouldBe(2);
+        report.Success.ShouldBeFalse();
     }
 
+    /// <summary>Spectre's parser rejects this before the command runs; --json still gets its document.</summary>
     [Fact]
     public void Json_ReportsAMistypedOption_AsAUsageError()
     {
-        // Spectre's parser rejects this before the command runs; --json still gets its document.
-        CommandRun run = RunCommand("--source", TestPaths.SpecPath("minimal"), "--outptu", "x.ts", "--json");
+        CommandRun run = RunCommand(
+            "--source",
+            TestPaths.SpecPath("minimal"),
+            "--outptu",
+            "x.ts",
+            "--json"
+        );
         JsonReport report = ParseReport(run);
 
-        Assert.Equal(2, run.ExitCode);
-        Assert.Equal("USAGE", report.Error!.Code);
-        Assert.Contains("outptu", report.Error.Message);
+        run.ExitCode.ShouldBe(2);
+        report.Error.ShouldNotBeNull().Code.ShouldBe("USAGE");
+        report.Error.Message.ShouldContain("outptu", Case.Sensitive);
     }
 
     [Fact]
@@ -613,16 +690,14 @@ public class OpenApiCommandTests
             CommandRun incompatible = RunCommand("--output", output);
             CommandRun missingValue = RunCommand("--source");
 
-            foreach (CommandRun run in new[] { typo, stray, incompatible, missingValue })
-            {
-                Assert.Equal(2, run.ExitCode);
-                Assert.NotEqual(string.Empty, run.Error);
-                Assert.Equal(string.Empty, run.Output);
-            }
+            AssertUsageError(typo);
+            AssertUsageError(stray);
+            AssertUsageError(incompatible);
+            AssertUsageError(missingValue);
 
-            Assert.Contains("outptu", typo.Error);
-            Assert.Contains("stray-argument", stray.Error);
-            Assert.False(File.Exists(output));
+            typo.Error.ShouldContain("outptu", Case.Sensitive);
+            stray.Error.ShouldContain("stray-argument", Case.Sensitive);
+            File.Exists(output).ShouldBeFalse();
         }
         finally
         {
@@ -630,25 +705,53 @@ public class OpenApiCommandTests
         }
     }
 
-    private static JsonReport ParseReport(CommandRun run)
+    private static void AssertUsageError(CommandRun run)
     {
-        Assert.Equal(string.Empty, run.Error);
-
-        return JsonSerializer.Deserialize<JsonReport>(run.Output, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        })!;
+        run.ExitCode.ShouldBe(2);
+        run.Error.ShouldNotBe(string.Empty);
+        run.Output.ShouldBe(string.Empty);
     }
 
-    // The documented JSON shape (see the README), spelled out independently of the production types.
+    private static readonly JsonSerializerOptions ReportOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
+    };
+
+    private static JsonReport ParseReport(CommandRun run)
+    {
+        run.Error.ShouldBe(string.Empty);
+
+        return JsonSerializer.Deserialize<JsonReport>(run.Output, ReportOptions).ShouldNotBeNull();
+    }
+
+    /// <summary>The documented JSON shape (see the README), spelled out independently of the production types.</summary>
     private sealed record JsonIssue(string Code, string Message);
 
-    private sealed record JsonResult(string? Name, string Source, string? OutputPath, string Status, List<JsonIssue> Warnings, JsonIssue? Error);
+    private sealed record JsonResult(
+        string? Name,
+        string Source,
+        string? OutputPath,
+        string Status,
+        List<JsonIssue> Warnings,
+        JsonIssue? Error
+    );
 
-    private sealed record JsonOperation(string Method, string Path, string? OperationId, string? Summary);
+    private sealed record JsonOperation(
+        string Method,
+        string Path,
+        string? OperationId,
+        string? Summary
+    );
 
-    private sealed record JsonSpec(string Title, string Version, string Openapi, int PathCount, int SchemaCount, List<JsonOperation> Operations);
+    private sealed record JsonSpec(
+        string Title,
+        string Version,
+        string Openapi,
+        int PathCount,
+        int SchemaCount,
+        List<JsonOperation> Operations
+    );
 
     private sealed record JsonDiagnostic(string Severity, string? Pointer, string Message);
 
@@ -661,16 +764,46 @@ public class OpenApiCommandTests
         List<JsonResult> Results,
         JsonSpec? Spec,
         List<JsonDiagnostic>? Diagnostics,
-        JsonIssue? Error);
+        JsonIssue? Error
+    );
+
+    private static void AssertWorkbenchLine(Regex workbench, string stdout, string expectedPath)
+    {
+        Match match = workbench.Match(stdout.Replace("\r\n", "\n", StringComparison.Ordinal));
+        match.Success.ShouldBeTrue(stdout);
+        match.Groups["path"].Value.ShouldBe(expectedPath);
+    }
+
+    private static string NestedDirectoryPast(string dir, int length)
+    {
+        const string segment = "nested-directory-segment";
+        int segments = 1;
+        while (
+            Path.GetFullPath(
+                $"{dir}/{string.Join('/', Enumerable.Repeat(segment, segments))}{Path.DirectorySeparatorChar}api.ts"
+            ).Length <= length
+        )
+        {
+            segments++;
+        }
+
+        return string.Join('/', Enumerable.Repeat(segment, segments));
+    }
 
     private static string CreateTempDirectory()
     {
-        string dir = Path.Combine(Path.GetTempPath(), "catalyst-command-tests", Guid.NewGuid().ToString("N"));
+        string dir = Path.Combine(
+            Path.GetTempPath(),
+            "catalyst-command-tests",
+            Guid.NewGuid().ToString("N")
+        );
         Directory.CreateDirectory(dir);
         return dir;
     }
 
-    private static async Task<(int ExitCode, string Error)> CapturingErrorAsync(Func<Task<int>> action)
+    private static async Task<(int ExitCode, string Error)> CapturingErrorAsync(
+        Func<Task<int>> action
+    )
     {
         StringWriter error = new();
         IAnsiConsole previous = Terminal.Error;

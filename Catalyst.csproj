@@ -1,49 +1,47 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>latestmajor</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Version>0.7.0</Version>
+    <Description>Modular CLI toolkit for automating code generation and development tasks</Description>
+    <Authors>alexpetrou94</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/alulore/catalyst</RepositoryUrl>
+  </PropertyGroup>
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
-        <LangVersion>latestmajor</LangVersion>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-        <Version>0.7.0</Version>
-        <Description>Modular CLI toolkit for automating code generation and development tasks</Description>
-        <Authors>alexpetrou94</Authors>
-        <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <RepositoryUrl>https://github.com/alulore/catalyst</RepositoryUrl>
-    </PropertyGroup>
+  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+    <OptimizationPreference>Size</OptimizationPreference>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
+    <EventSourceSupport>false</EventSourceSupport>
+    <DebuggerSupport>false</DebuggerSupport>
+    <MetricsSupport>false</MetricsSupport>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+  </PropertyGroup>
 
-    <PropertyGroup Condition="'$(PublishAot)' == 'true'">
-        <OptimizationPreference>Size</OptimizationPreference>
-        <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
-        <EventSourceSupport>false</EventSourceSupport>
-        <DebuggerSupport>false</DebuggerSupport>
-        <MetricsSupport>false</MetricsSupport>
-        <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
-        <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
-    </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Catalyst.Tests" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <InternalsVisibleTo Include="Catalyst.Tests" />
-    </ItemGroup>
+  <ItemGroup>
+    <Compile Remove="Catalyst.Tests\**\*.cs" />
+    <None Remove="Catalyst.Tests\**" />
+    <None Include=".examples\generated-api-example.ts" />
+    <None Include=".examples\openapi-example.json" />
+    <None Include=".examples\openapi-invalid.json" />
+    <None Include=".examples\out.ts" />
+  </ItemGroup>
 
-    <ItemGroup>
-        <Compile Remove="Catalyst.Tests\**\*.cs" />
-        <None Remove="Catalyst.Tests\**" />
-        <None Include=".examples\generated-api-example.ts" />
-        <None Include=".examples\openapi-example.json" />
-        <None Include=".examples\openapi-invalid.json" />
-        <None Include=".examples\out.ts" />
-    </ItemGroup>
-
-    <ItemGroup>
-      <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
-      <PackageReference Include="Microsoft.OpenApi" Version="3.10.2" />
-      <PackageReference Include="Microsoft.OpenApi.YamlReader" Version="3.10.2" />
-      <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
-      <PackageReference Include="Spectre.Console" Version="0.55.2" />
-      <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
-      <PackageReference Include="Auxil" Version="0.2.0" />
-    </ItemGroup>
-
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.13" />
+    <PackageReference Include="Microsoft.OpenApi" Version="3.10.2" />
+    <PackageReference Include="Microsoft.OpenApi.YamlReader" Version="3.10.2" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
+    <PackageReference Include="Spectre.Console" Version="0.55.2" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
+    <PackageReference Include="Auxil" Version="0.2.0" />
+  </ItemGroup>
 </Project>

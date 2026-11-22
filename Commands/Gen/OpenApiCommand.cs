@@ -1,6 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
-using System.Net.Http;
+using Auxil.Common;
 using Catalyst.Common.Configuration;
 using Catalyst.Common.Models;
 using Catalyst.Common.Services;
@@ -8,25 +8,30 @@ using Microsoft.OpenApi;
 using Microsoft.OpenApi.Reader;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using Auxil.Common;
 
 namespace Catalyst.Commands.Gen;
 
 [Description("Deserializes and validates an OpenAPI specification for future code generation")]
 internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
 {
-    public class Settings : CommandSettings
+    internal class Settings : CommandSettings
     {
         [CommandOption("--source <SOURCE>")]
-        [Description("Path to a local JSON or YAML file, or a URL, of an OpenAPI specification. Omit it to generate every client defined in catalyst.config.json.")]
+        [Description(
+            "Path to a local JSON or YAML file, or a URL, of an OpenAPI specification. Omit it to generate every client defined in catalyst.config.json."
+        )]
         public string Source { get; init; } = string.Empty;
 
         [CommandOption("--language <LANGUAGE>")]
-        [Description("Output language for code generation. Options: typescript. Defaults to typescript when --output is given")]
+        [Description(
+            "Output language for code generation. Options: typescript. Defaults to typescript when --output is given"
+        )]
         public string? Language { get; init; }
 
         [CommandOption("--output <PATH>")]
-        [Description("Output file or directory path. Required when --language is specified. A path with a trailing separator, an existing directory, or no file extension is a folder: the file is named after --class-name")]
+        [Description(
+            "Output file or directory path. Required when --language is specified. A path with a trailing separator, an existing directory, or no file extension is a folder: the file is named after --class-name"
+        )]
         public string? Output { get; init; }
 
         [CommandOption("--class-name <NAME>")]
@@ -34,19 +39,27 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
         public string? ClassName { get; init; }
 
         [CommandOption("--skip-paths <PATHS>")]
-        [Description("Path prefixes to skip during generation (e.g. /api/auth/). Repeatable or comma-separated. Overrides catalyst.config.json.")]
+        [Description(
+            "Path prefixes to skip during generation (e.g. /api/auth/). Repeatable or comma-separated. Overrides catalyst.config.json."
+        )]
         public string[]? SkipPaths { get; init; }
 
         [CommandOption("--insecure")]
-        [Description("Skip TLS certificate validation when fetching a remote OpenAPI spec over HTTPS. Only use with a local server that has an untrusted (e.g. self-signed) certificate. Validation stays enabled by default.")]
+        [Description(
+            "Skip TLS certificate validation when fetching a remote OpenAPI spec over HTTPS. Only use with a local server that has an untrusted (e.g. self-signed) certificate. Validation stays enabled by default."
+        )]
         public bool Insecure { get; init; }
 
         [CommandOption("--check")]
-        [Description("Do not write anything: generate in memory and compare with the files on disk. Exit code 1 when a client is out of date or missing. Works with --source and --output, or for every configured client.")]
+        [Description(
+            "Do not write anything: generate in memory and compare with the files on disk. Exit code 1 when a client is out of date or missing. Works with --source and --output, or for every configured client."
+        )]
         public bool Check { get; init; }
 
         [CommandOption("--json")]
-        [Description("Print one JSON document on stdout instead of text (see the README for the format). Works in every mode.")]
+        [Description(
+            "Print one JSON document on stdout instead of text (see the README for the format). Works in every mode."
+        )]
         public bool Json { get; init; }
 
         /// <summary>The language to generate: --language, else typescript whenever --output is given. Null means validate only.</summary>
@@ -55,28 +68,41 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
             : !string.IsNullOrWhiteSpace(Output) ? "typescript"
             : null;
 
-        /// <summary>The first usage problem of these options, or null when they are fine together.</summary>
+        /// <summary>
+        /// Spectre binds this internal marker as the value of an option that is last on the line without a value
+        /// (for example a trailing "--source"), instead of reporting it.
+        /// </summary>
+        private const string MissingValueMarker = "__default_command";
+
+        /// <summary>
+        /// The first usage problem of these options, or null when they are fine together. Without --source the command
+        /// generates every configured client, so the single-client options do not apply.
+        /// </summary>
         internal string? GetUsageError()
         {
-            // Spectre binds its internal "__default_command" marker as the value of an option that is last on
-            // the line without a value (for example a trailing "--source"), instead of reporting it.
-            foreach ((string option, string? value) in new[] { ("--source", Source), ("--language", Language), ("--output", Output), ("--class-name", ClassName) })
+            foreach (
+                (string option, string? value) in new[]
+                {
+                    ("--source", Source),
+                    ("--language", Language),
+                    ("--output", Output),
+                    ("--class-name", ClassName),
+                }
+            )
             {
-                if (value == "__default_command")
+                if (value == MissingValueMarker)
                 {
                     return $"The {option} option needs a value.";
                 }
             }
 
-            if (SkipPaths?.Contains("__default_command") == true)
+            if (SkipPaths?.Contains(MissingValueMarker) == true)
             {
                 return "The --skip-paths option needs a value.";
             }
 
             if (string.IsNullOrWhiteSpace(Source))
             {
-                // Without --source the command generates every configured client, so the
-                // single-client options do not apply.
                 return HasSingleClientOptions()
                     ? "--language, --output, --class-name, --skip-paths and --insecure require --source. Pass --source, or omit the single-client options to generate every client from catalyst.config.json."
                     : null;
@@ -95,9 +121,9 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
             return null;
         }
 
+        /// <summary>With --json the usage error is reported in the JSON document (RunAsync), not by Spectre.</summary>
         public override ValidationResult Validate()
         {
-            // With --json the usage error is reported in the JSON document (RunAsync), not by Spectre.
             string? usageError = Json ? null : GetUsageError();
             return usageError == null ? base.Validate() : ValidationResult.Error(usageError);
         }
@@ -112,7 +138,11 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
         }
     }
 
-    protected override async Task<int> ExecuteAsync([NotNull] CommandContext context, [NotNull] Settings settings, CancellationToken cancellationToken)
+    protected override async Task<int> ExecuteAsync(
+        [NotNull] CommandContext context,
+        [NotNull] Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         return await RunAsync(settings, cancellationToken).ConfigureAwait(false);
     }
@@ -149,7 +179,10 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
             : RunMode.Validate;
     }
 
-    private static async Task<RunReport> BuildReportAsync(Settings settings, CancellationToken cancellationToken)
+    private static async Task<RunReport> BuildReportAsync(
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
         string mode = ModeOf(settings);
 
@@ -166,58 +199,95 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
 
         if (mode == RunMode.Validate)
         {
-            return await BuildValidationReportAsync(settings, cancellationToken).ConfigureAwait(false);
+            return await BuildValidationReportAsync(settings, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (settings.Output is not { } output || settings.EffectiveLanguage is not { } language)
+        {
+            return RunReport.Failure(
+                mode,
+                IssueCodes.Usage,
+                "The --output option is required to generate a client."
+            );
         }
 
         ClientRequest request = new(
             Name: null,
             Source: settings.Source,
-            Output: settings.Output!,
+            Output: output,
             ClassName: settings.ClassName,
-            Language: settings.EffectiveLanguage!,
+            Language: language,
             SkipPaths: ResolveSkipPaths(settings.SkipPaths),
-            Insecure: settings.Insecure);
+            Insecure: settings.Insecure
+        );
 
         RunReport report = new() { Mode = mode, SingleClient = true };
-        report.Results.Add(await ClientGenerator.GenerateAsync(request, check: mode == RunMode.Check, cancellationToken).ConfigureAwait(false));
+        report.Results.Add(
+            await ClientGenerator
+                .GenerateAsync(request, check: mode == RunMode.Check, cancellationToken)
+                .ConfigureAwait(false)
+        );
         return report.Complete();
     }
 
     /// <summary>Validation only: read and parse the spec, then describe it. Source and parse failures are top-level errors.</summary>
-    private static async Task<RunReport> BuildValidationReportAsync(Settings settings, CancellationToken cancellationToken)
+    private static async Task<RunReport> BuildValidationReportAsync(
+        Settings settings,
+        CancellationToken cancellationToken
+    )
     {
-        Result<SourceResolveResult> resolveResult = await SourceResolver.Resolve(settings.Source, settings.Insecure, cancellationToken).ConfigureAwait(false);
-        if (!resolveResult.IsSuccess)
+        Result<SourceResolveResult> resolveResult = await SourceResolver
+            .ResolveAsync(settings.Source, settings.Insecure, cancellationToken)
+            .ConfigureAwait(false);
+        if (resolveResult is not { IsSuccess: true, Value: { } source })
         {
-            return RunReport.Failure(RunMode.Validate, SourceResolver.ClassifyFailure(resolveResult.ErrorMessage), resolveResult.ErrorMessage ?? "Unknown error");
+            return RunReport.Failure(
+                RunMode.Validate,
+                SourceResolver.ClassifyFailure(resolveResult.ErrorMessage),
+                resolveResult.ErrorMessage ?? "Unknown error"
+            );
         }
 
-        Result<OpenApiParseResult> parseResult = OpenApiParser.Parse(resolveResult.Value!.Content, resolveResult.Value!.DisplayPath);
-        if (!parseResult.IsSuccess)
+        Result<OpenApiParseResult> parseResult = OpenApiParser.Parse(
+            source.Content,
+            source.DisplayPath
+        );
+        if (parseResult is not { IsSuccess: true, Value: { } parsed })
         {
-            return RunReport.Failure(RunMode.Validate, IssueCodes.ParseFailed, parseResult.ErrorMessage ?? "Unknown error");
+            return RunReport.Failure(
+                RunMode.Validate,
+                IssueCodes.ParseFailed,
+                parseResult.ErrorMessage ?? "Unknown error"
+            );
         }
 
-        OpenApiParseResult parsed = parseResult.Value!;
         RunReport report = new()
         {
             Mode = RunMode.Validate,
             Spec = SummarizeSpec(parsed),
             Diagnostics = DescribeDiagnostics(parsed.Diagnostic),
-            Parsed = (resolveResult.Value!.DisplayPath, parsed),
+            Parsed = (source.DisplayPath, parsed),
         };
 
         int errorCount = parsed.Diagnostic.Errors.Count;
         if (errorCount > 0)
         {
-            report.Error = new Issue(IssueCodes.SpecInvalid, $"OpenAPI spec has {errorCount} validation error(s).");
+            report.Error = new Issue(
+                IssueCodes.SpecInvalid,
+                $"OpenAPI spec has {errorCount} validation error(s)."
+            );
         }
 
         return report.Complete();
     }
 
     /// <summary>Generates or checks every client defined under gen.openapi.clients in the nearest catalyst.config.json.</summary>
-    internal static async Task<RunReport> BuildConfiguredReportAsync(string mode, CancellationToken cancellationToken, string? clientName = null)
+    internal static async Task<RunReport> BuildConfiguredReportAsync(
+        string mode,
+        CancellationToken cancellationToken,
+        string? clientName = null
+    )
     {
         ConfigLoadResult loadResult = ConfigLoader.LoadDetailed(Directory.GetCurrentDirectory());
 
@@ -228,26 +298,51 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
 
         if (loadResult.Config is null || loadResult.Path is null)
         {
-            return RunReport.Failure(mode, IssueCodes.ConfigNotFound, "No catalyst.config.json found in this directory or any parent. Pass --source to generate a single client.");
+            return RunReport.Failure(
+                mode,
+                IssueCodes.ConfigNotFound,
+                "No catalyst.config.json found in this directory or any parent. Pass --source to generate a single client."
+            );
         }
 
         if (loadResult.Config.Gen.OpenApi.Clients.Count == 0)
         {
-            return RunReport.Failure(mode, IssueCodes.NoClients, $"{loadResult.Path} defines no clients under gen.openapi.clients.");
+            return RunReport.Failure(
+                mode,
+                IssueCodes.NoClients,
+                $"{loadResult.Path} defines no clients under gen.openapi.clients."
+            );
         }
 
-        if (!string.IsNullOrWhiteSpace(clientName)
-            && !loadResult.Config.Gen.OpenApi.Clients.Any(c => c.Name.Trim().Equals(clientName.Trim(), StringComparison.OrdinalIgnoreCase)))
+        if (
+            !string.IsNullOrWhiteSpace(clientName)
+            && !loadResult.Config.Gen.OpenApi.Clients.Any(c =>
+                c.Name.Trim().Equals(clientName.Trim(), StringComparison.OrdinalIgnoreCase)
+            )
+        )
         {
-            return RunReport.Failure(mode, IssueCodes.Usage, $"No client named \"{clientName}\" in {loadResult.Path}. Configured clients: {string.Join(", ", loadResult.Config.Gen.OpenApi.Clients.Select(c => c.Name))}.");
+            return RunReport.Failure(
+                mode,
+                IssueCodes.Usage,
+                $"No client named \"{clientName}\" in {loadResult.Path}. Configured clients: {string.Join(", ", loadResult.Config.Gen.OpenApi.Clients.Select(c => c.Name))}."
+            );
         }
 
-        string configDirectory = Path.GetDirectoryName(loadResult.Path)!;
+        string configDirectory = Path.GetDirectoryName(loadResult.Path)
+            ?? Directory.GetCurrentDirectory();
 
         RunReport report = new() { Mode = mode, ConfigPath = loadResult.Path };
-        report.Results.AddRange(await ConfiguredClientRunner
-            .RunAsync(loadResult.Config, configDirectory, cancellationToken, check: mode == RunMode.Check, onlyClient: clientName)
-            .ConfigureAwait(false));
+        report.Results.AddRange(
+            await ConfiguredClientRunner
+                .RunAsync(
+                    loadResult.Config,
+                    configDirectory,
+                    cancellationToken,
+                    check: mode == RunMode.Check,
+                    onlyClient: clientName
+                )
+                .ConfigureAwait(false)
+        );
         return report.Complete();
     }
 
@@ -256,45 +351,83 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
         OpenApiDocument document = parsed.Document;
         List<SpecOperation> operations = [];
 
-        foreach (KeyValuePair<string, IOpenApiPathItem> path in (document.Paths ?? []).OrderBy(p => p.Key, StringComparer.Ordinal))
+        foreach (
+            KeyValuePair<string, IOpenApiPathItem> path in (document.Paths ?? []).OrderBy(
+                p => p.Key,
+                StringComparer.Ordinal
+            )
+        )
         {
-            foreach (KeyValuePair<HttpMethod, OpenApiOperation> operation in (path.Value.Operations ?? []).OrderBy(o => o.Key.Method, StringComparer.Ordinal))
+            foreach (
+                KeyValuePair<HttpMethod, OpenApiOperation> operation in (
+                    path.Value.Operations ?? []
+                ).OrderBy(o => o.Key.Method, StringComparer.Ordinal)
+            )
             {
-                operations.Add(new SpecOperation(
-                    operation.Key.Method.ToUpperInvariant(),
-                    path.Key,
-                    string.IsNullOrWhiteSpace(operation.Value.OperationId) ? null : operation.Value.OperationId,
-                    string.IsNullOrWhiteSpace(operation.Value.Summary) ? null : operation.Value.Summary));
+                operations.Add(
+                    new SpecOperation(
+                        operation.Key.Method.ToUpperInvariant(),
+                        path.Key,
+                        string.IsNullOrWhiteSpace(operation.Value.OperationId)
+                            ? null
+                            : operation.Value.OperationId,
+                        string.IsNullOrWhiteSpace(operation.Value.Summary)
+                            ? null
+                            : operation.Value.Summary
+                    )
+                );
             }
         }
-
-        // The reader reports the spec version as a major.minor enum ("OpenApi3_0"), not the exact text.
-        string version = parsed.Diagnostic.SpecificationVersion.ToString().Replace("OpenApi", string.Empty).Replace('_', '.');
 
         return new SpecSummary(
             document.Info?.Title,
             document.Info?.Version,
-            version,
+            SpecVersionOf(parsed.Diagnostic),
             document.Paths?.Count ?? 0,
             document.Components?.Schemas?.Count ?? 0,
-            operations);
+            operations
+        );
+    }
+
+    /// <summary>The reader reports the spec version as a major.minor enum ("OpenApi3_0"), not the exact text.</summary>
+    private static string SpecVersionOf(OpenApiDiagnostic diagnostic)
+    {
+        return diagnostic
+            .SpecificationVersion.ToString()
+            .Replace("OpenApi", string.Empty, StringComparison.Ordinal)
+            .Replace('_', '.');
     }
 
     private static List<DiagnosticEntry> DescribeDiagnostics(OpenApiDiagnostic diagnostic)
     {
-        return diagnostic.Errors.Select(e => new DiagnosticEntry("error", e.Pointer, e.Message))
-            .Concat(diagnostic.Warnings.Select(w => new DiagnosticEntry("warning", w.Pointer, w.Message)))
+        return diagnostic
+            .Errors.Select(e => new DiagnosticEntry("error", e.Pointer, e.Message))
+            .Concat(
+                diagnostic.Warnings.Select(w => new DiagnosticEntry(
+                    "warning",
+                    w.Pointer,
+                    w.Message
+                ))
+            )
             .ToList();
     }
 
-    internal static List<string> ResolveSkipPaths(string[]? cliSkipPaths, CatalystConfig? config = null)
+    internal static List<string> ResolveSkipPaths(
+        string[]? cliSkipPaths,
+        CatalystConfig? config = null
+    )
     {
         if (cliSkipPaths is { Length: > 0 })
         {
             List<string> expanded = [];
             foreach (string raw in cliSkipPaths)
             {
-                foreach (string part in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                foreach (
+                    string part in raw.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                    )
+                )
                 {
                     expanded.Add(part);
                 }
@@ -326,8 +459,9 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
             return string.Empty;
         }
 
-        bool looksLikeDirectory = output.EndsWith(Path.DirectorySeparatorChar)
-            || output.EndsWith(Path.AltDirectorySeparatorChar)
+        bool looksLikeDirectory =
+            output.EndsWith(Path.DirectorySeparatorChar, StringComparison.Ordinal)
+            || output.EndsWith(Path.AltDirectorySeparatorChar, StringComparison.Ordinal)
             || Directory.Exists(output)
             || !Path.HasExtension(output);
 
@@ -346,7 +480,7 @@ internal sealed class OpenApiCommand : AsyncCommand<OpenApiCommand.Settings>
     private static string SanitizeFileName(string name)
     {
         char[] invalid = Path.GetInvalidFileNameChars();
-        string sanitized = new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
+        string sanitized = new(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray());
         return string.IsNullOrWhiteSpace(sanitized) ? "api" : sanitized;
     }
 }

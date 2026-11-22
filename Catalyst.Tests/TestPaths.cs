@@ -6,7 +6,13 @@ internal static class TestPaths
     /// <summary>Names of the specs under Fixtures/Specs that have a snapshot.</summary>
     public static readonly string[] SnapshotSpecs =
     [
-        "enterprise", "minimal", "edge-cases", "petstore", "eshop-catalog", "spotify", "museum",
+        "enterprise",
+        "minimal",
+        "edge-cases",
+        "petstore",
+        "eshop-catalog",
+        "spotify",
+        "museum",
     ];
 
     /// <summary>The Catalyst.Tests source folder. Snapshots are updated here, not in the build output.</summary>
@@ -48,6 +54,8 @@ internal static class TestPaths
             directory = directory.Parent;
         }
 
-        throw new InvalidOperationException("Could not locate Catalyst.Tests.csproj above " + AppContext.BaseDirectory);
+        throw new InvalidOperationException(
+            "Could not locate Catalyst.Tests.csproj above " + AppContext.BaseDirectory
+        );
     }
 }
