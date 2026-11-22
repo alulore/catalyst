@@ -16,18 +16,30 @@ internal static class ConfiguredClientRunner
         string configDirectory,
         CancellationToken cancellationToken,
         bool check = false,
-        string? onlyClient = null)
+        string? onlyClient = null
+    )
     {
         List<ClientResult> results = [];
 
         foreach (OpenApiClientConfig client in config.Gen.OpenApi.Clients)
         {
-            if (!string.IsNullOrWhiteSpace(onlyClient) && !(client.Name?.Trim().Equals(onlyClient.Trim(), StringComparison.OrdinalIgnoreCase) ?? false))
+            if (
+                !string.IsNullOrWhiteSpace(onlyClient)
+                && !(
+                    client
+                        .Name?.Trim()
+                        .Equals(onlyClient.Trim(), StringComparison.OrdinalIgnoreCase)
+                    ?? false
+                )
+            )
             {
                 continue;
             }
 
-            results.Add(await GenerateClient(client, config, configDirectory, check, cancellationToken).ConfigureAwait(false));
+            results.Add(
+                await GenerateClientAsync(client, config, configDirectory, check, cancellationToken)
+                    .ConfigureAwait(false)
+            );
         }
 
         return results;
@@ -36,7 +48,9 @@ internal static class ConfiguredClientRunner
     /// <summary>Relative file sources resolve against the config folder, matching how output works.</summary>
     internal static string ResolveSource(string source, string configDirectory)
     {
-        return SourceResolver.DetermineSourceType(source) == SourceType.FilePath && !Path.IsPathRooted(source)
+        return
+            SourceResolver.DetermineSourceType(source) == SourceType.FilePath
+            && !Path.IsPathRooted(source)
             ? Path.Combine(configDirectory, source)
             : source;
     }
@@ -45,12 +59,13 @@ internal static class ConfiguredClientRunner
     /// Generates one client. Whatever goes wrong fails only this client, so the rest of the batch still
     /// runs; the one exception is cancellation, which stops the whole run.
     /// </summary>
-    private static async Task<ClientResult> GenerateClient(
+    private static async Task<ClientResult> GenerateClientAsync(
         OpenApiClientConfig client,
         CatalystConfig config,
         string configDirectory,
         bool check,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken
+    )
     {
         string name = client.Name?.Trim() ?? string.Empty;
         string source = client.Source?.Trim() ?? string.Empty;
@@ -58,26 +73,53 @@ internal static class ConfiguredClientRunner
 
         try
         {
-            if (name.Length == 0 || (client.Output?.Trim().Length ?? 0) == 0)
+            if (
+                name.Length == 0
+                || client.Output is not { } configuredOutput
+                || configuredOutput.Trim().Length == 0
+            )
             {
-                return ClientResult.Fail(displayName, source, IssueCodes.ClientInvalid, "A client entry needs both a name and an output path.");
+                return ClientResult.Fail(
+                    displayName,
+                    source,
+                    IssueCodes.ClientInvalid,
+                    "A client entry needs both a name and an output path."
+                );
             }
 
             if (source.Length == 0)
             {
-                return ClientResult.Fail(name, source, IssueCodes.ClientInvalid, "No source is configured for this client. Add a source file path or URL.");
+                return ClientResult.Fail(
+                    name,
+                    source,
+                    IssueCodes.ClientInvalid,
+                    "No source is configured for this client. Add a source file path or URL."
+                );
             }
 
-            string output = Path.IsPathRooted(client.Output!)
-                ? client.Output!
-                : Path.Combine(configDirectory, client.Output!);
+            string output = Path.IsPathRooted(configuredOutput)
+                ? configuredOutput
+                : Path.Combine(configDirectory, configuredOutput);
 
             source = ResolveSource(source, configDirectory);
 
-            List<string> skipPaths = client.SkipPaths.Count > 0 ? client.SkipPaths : config.Gen.OpenApi.SkipPaths;
+            List<string> skipPaths =
+                client.SkipPaths.Count > 0 ? client.SkipPaths : config.Gen.OpenApi.SkipPaths;
 
             return await ClientGenerator
-                .GenerateAsync(new ClientRequest(name, source, output, name, "typescript", skipPaths, client.Insecure), check, cancellationToken)
+                .GenerateAsync(
+                    new ClientRequest(
+                        name,
+                        source,
+                        output,
+                        name,
+                        "typescript",
+                        skipPaths,
+                        client.Insecure
+                    ),
+                    check,
+                    cancellationToken
+                )
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

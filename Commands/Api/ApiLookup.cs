@@ -3,9 +3,6 @@ using Catalyst.Common.Models;
 
 namespace Catalyst.Commands.Api;
 
-/// <summary>The outcome of resolving an operation selector: one operation, or an error code with suggestions.</summary>
-internal sealed record OperationMatch(ApiOperation? Operation, string? ErrorCode, string? Message, List<string> Suggestions);
-
 /// <summary>Finding operations, types and close matches in a <see cref="ClientModel"/>.</summary>
 internal static partial class ApiLookup
 {
@@ -24,47 +21,15 @@ internal static partial class ApiLookup
     public static OperationMatch FindOperation(ClientModel model, string selector)
     {
         string text = selector.Trim();
-        List<ApiOperation> matches = [];
 
         Match methodAndPath = MethodAndPath().Match(text);
-        if (methodAndPath.Success)
-        {
-            string method = methodAndPath.Groups["method"].Value;
-            string path = methodAndPath.Groups["path"].Value;
-
-            matches = model.Operations.Where(o => o.Method.Equals(method, StringComparison.OrdinalIgnoreCase) && o.Path == path).ToList();
-            if (matches.Count == 0)
-            {
-                string shape = PathParameter().Replace(path, "{}");
-                matches = model.Operations
-                    .Where(o => o.Method.Equals(method, StringComparison.OrdinalIgnoreCase) && PathParameter().Replace(o.Path, "{}") == shape)
-                    .ToList();
-            }
-        }
-        else
-        {
-            string call = text.StartsWith("client.", StringComparison.OrdinalIgnoreCase) ? text["client.".Length..] : text;
-            string[] parts = call.Split('.');
-
-            if (parts.Length == 2)
-            {
-                matches = model.Operations.Where(o => o.Verb.Equals(parts[0], StringComparison.OrdinalIgnoreCase) && o.MethodName == parts[1]).ToList();
-                if (matches.Count == 0)
-                {
-                    matches = model.Operations.Where(o => o.Verb.Equals(parts[0], StringComparison.OrdinalIgnoreCase) && o.MethodName.Equals(parts[1], StringComparison.OrdinalIgnoreCase)).ToList();
-                }
-            }
-
-            if (matches.Count == 0)
-            {
-                matches = model.Operations.Where(o => o.OperationId == text).ToList();
-            }
-
-            if (matches.Count == 0)
-            {
-                matches = model.Operations.Where(o => string.Equals(o.OperationId, text, StringComparison.OrdinalIgnoreCase)).ToList();
-            }
-        }
+        List<ApiOperation> matches = methodAndPath.Success
+            ? MatchMethodAndPath(
+                model,
+                methodAndPath.Groups["method"].Value,
+                methodAndPath.Groups["path"].Value
+            )
+            : MatchCallOrId(model, text);
 
         if (matches.Count == 1)
         {
@@ -73,10 +38,92 @@ internal static partial class ApiLookup
 
         if (matches.Count > 1)
         {
-            return new OperationMatch(null, IssueCodes.OperationAmbiguous, $"\"{selector}\" matches {matches.Count} operations. Use \"METHOD /path\" or the generated call.", matches.Take(MaxSuggestions).Select(Describe).ToList());
+            return new OperationMatch(
+                null,
+                IssueCodes.OperationAmbiguous,
+                $"\"{selector}\" matches {matches.Count} operations. Use \"METHOD /path\" or the generated call.",
+                matches.Take(MaxSuggestions).Select(Describe).ToList()
+            );
         }
 
-        return new OperationMatch(null, IssueCodes.OperationNotFound, $"No operation matches \"{selector}\".", SuggestOperations(model, text));
+        return new OperationMatch(
+            null,
+            IssueCodes.OperationNotFound,
+            $"No operation matches \"{selector}\".",
+            SuggestOperations(model, text)
+        );
+    }
+
+    private static List<ApiOperation> MatchMethodAndPath(
+        ClientModel model,
+        string method,
+        string path
+    )
+    {
+        List<ApiOperation> matches = model
+            .Operations.Where(o =>
+                o.Method.Equals(method, StringComparison.OrdinalIgnoreCase) && o.Path == path
+            )
+            .ToList();
+        if (matches.Count > 0)
+        {
+            return matches;
+        }
+
+        string shape = PathParameter().Replace(path, "{}");
+        return model
+            .Operations.Where(o =>
+                o.Method.Equals(method, StringComparison.OrdinalIgnoreCase)
+                && PathParameter().Replace(o.Path, "{}") == shape
+            )
+            .ToList();
+    }
+
+    private static List<ApiOperation> MatchCallOrId(ClientModel model, string text)
+    {
+        string call = text.StartsWith("client.", StringComparison.OrdinalIgnoreCase)
+            ? text["client.".Length..]
+            : text;
+        string[] parts = call.Split('.');
+
+        List<ApiOperation> matches = parts.Length == 2 ? MatchCall(model, parts[0], parts[1]) : [];
+        if (matches.Count > 0)
+        {
+            return matches;
+        }
+
+        matches = model.Operations.Where(o => o.OperationId == text).ToList();
+        if (matches.Count > 0)
+        {
+            return matches;
+        }
+
+        return model
+            .Operations.Where(o =>
+                string.Equals(o.OperationId, text, StringComparison.OrdinalIgnoreCase)
+            )
+            .ToList();
+    }
+
+    private static List<ApiOperation> MatchCall(ClientModel model, string verb, string methodName)
+    {
+        List<ApiOperation> matches = model
+            .Operations.Where(o =>
+                o.Verb.Equals(verb, StringComparison.OrdinalIgnoreCase)
+                && o.MethodName == methodName
+            )
+            .ToList();
+        if (matches.Count > 0)
+        {
+            return matches;
+        }
+
+        return model
+            .Operations.Where(o =>
+                o.Verb.Equals(verb, StringComparison.OrdinalIgnoreCase)
+                && o.MethodName.Equals(methodName, StringComparison.OrdinalIgnoreCase)
+            )
+            .ToList();
     }
 
     /// <summary>The operations whose method, path, operationId or generated call is closest to the text.</summary>
@@ -84,8 +131,21 @@ internal static partial class ApiLookup
     {
         string query = text.ToLowerInvariant();
 
-        return model.Operations
-            .Select(o => (Operation: o, Score: Distance(query, [$"{o.Method} {o.Path}", o.OperationId ?? string.Empty, o.Call, $"{o.Verb}.{o.MethodName}"])))
+        return model
+            .Operations.Select(o =>
+                (
+                    Operation: o,
+                    Score: Distance(
+                        query,
+                        [
+                            $"{o.Method} {o.Path}",
+                            o.OperationId ?? string.Empty,
+                            o.Call,
+                            $"{o.Verb}.{o.MethodName}",
+                        ]
+                    )
+                )
+            )
             .OrderBy(pair => pair.Score)
             .ThenBy(pair => pair.Operation.Path, StringComparer.Ordinal)
             .Take(MaxSuggestions)
@@ -97,8 +157,10 @@ internal static partial class ApiLookup
     {
         string query = text.ToLowerInvariant();
 
-        return model.Types
-            .Select(t => (Type: t, Score: Distance(query, [t.Name, t.ComponentName ?? string.Empty])))
+        return model
+            .Types.Select(t =>
+                (Type: t, Score: Distance(query, [t.Name, t.ComponentName ?? string.Empty]))
+            )
             .OrderBy(pair => pair.Score)
             .ThenBy(pair => pair.Type.Name, StringComparer.Ordinal)
             .Take(MaxSuggestions)
@@ -116,15 +178,23 @@ internal static partial class ApiLookup
     {
         return model.Types.FirstOrDefault(t => t.Name == name)
             ?? model.Types.FirstOrDefault(t => t.ComponentName == name)
-            ?? model.Types.FirstOrDefault(t => t.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            ?? model.Types.FirstOrDefault(t => string.Equals(t.ComponentName, name, StringComparison.OrdinalIgnoreCase));
+            ?? model.Types.FirstOrDefault(t =>
+                t.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
+            )
+            ?? model.Types.FirstOrDefault(t =>
+                string.Equals(t.ComponentName, name, StringComparison.OrdinalIgnoreCase)
+            );
     }
 
     /// <summary>
     /// The named types reachable from the roots, dependencies first, each once. A depth limits how far to follow
     /// dependencies (0 is the roots only); null follows all of them.
     /// </summary>
-    public static List<TypeDeclaration> TypeClosure(ClientModel model, IEnumerable<string> roots, int? depth = null)
+    public static List<TypeDeclaration> TypeClosure(
+        ClientModel model,
+        IEnumerable<string> roots,
+        int? depth = null
+    )
     {
         Dictionary<string, TypeDeclaration> byName = model.Types.ToDictionary(t => t.Name);
         List<string> rootList = roots.Where(byName.ContainsKey).Distinct().ToList();
@@ -185,9 +255,18 @@ internal static partial class ApiLookup
     {
         int best = int.MaxValue;
 
-        foreach (string candidate in candidates.Where(c => c.Length > 0).Select(c => c.ToLowerInvariant()))
+        foreach (
+            string candidate in candidates
+                .Where(c => c.Length > 0)
+                .Select(c => c.ToLowerInvariant())
+        )
         {
-            best = Math.Min(best, candidate.Contains(query, StringComparison.Ordinal) ? 0 : EditDistance(query, candidate));
+            best = Math.Min(
+                best,
+                candidate.Contains(query, StringComparison.Ordinal)
+                    ? 0
+                    : EditDistance(query, candidate)
+            );
         }
 
         return best;
@@ -205,7 +284,10 @@ internal static partial class ApiLookup
             for (int j = 1; j <= b.Length; j++)
             {
                 int cost = a[i - 1] == b[j - 1] ? 0 : 1;
-                current[j] = Math.Min(Math.Min(current[j - 1] + 1, previous[j] + 1), previous[j - 1] + cost);
+                current[j] = Math.Min(
+                    Math.Min(current[j - 1] + 1, previous[j] + 1),
+                    previous[j - 1] + cost
+                );
             }
 
             previous = current;
@@ -215,17 +297,36 @@ internal static partial class ApiLookup
     }
 
     /// <summary>The operations matching the list filters: every filter term, the tag, and the HTTP method.</summary>
-    public static List<ApiOperation> FilterOperations(ClientModel model, string? filter, string? tag, string? method)
+    public static List<ApiOperation> FilterOperations(
+        ClientModel model,
+        string? filter,
+        string? tag,
+        string? method
+    )
     {
-        string[] terms = (filter ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        string[] terms = (filter ?? string.Empty).Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
 
-        return model.Operations
-            .Where(o => string.IsNullOrWhiteSpace(method) || o.Method.Equals(method.Trim(), StringComparison.OrdinalIgnoreCase))
-            .Where(o => string.IsNullOrWhiteSpace(tag) || o.Tags.Any(t => t.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase)))
+        return model
+            .Operations.Where(o =>
+                string.IsNullOrWhiteSpace(method)
+                || o.Method.Equals(method.Trim(), StringComparison.OrdinalIgnoreCase)
+            )
+            .Where(o =>
+                string.IsNullOrWhiteSpace(tag)
+                || o.Tags.Any(t => t.Equals(tag.Trim(), StringComparison.OrdinalIgnoreCase))
+            )
             .Where(o =>
             {
-                string haystack = string.Join(' ', [o.Method, o.Path, o.OperationId, o.MethodName, o.Call, o.Summary, .. o.Tags]);
-                return terms.All(term => haystack.Contains(term, StringComparison.OrdinalIgnoreCase));
+                string haystack = string.Join(
+                    ' ',
+                    [o.Method, o.Path, o.OperationId, o.MethodName, o.Call, o.Summary, .. o.Tags]
+                );
+                return terms.All(term =>
+                    haystack.Contains(term, StringComparison.OrdinalIgnoreCase)
+                );
             })
             .OrderBy(o => o.Path, StringComparer.Ordinal)
             .ThenBy(o => o.Method, StringComparer.Ordinal)

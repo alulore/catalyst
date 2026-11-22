@@ -29,14 +29,22 @@ internal static class UsageErrors
         {
             if (args.Contains("--json") && args.Length > 1 && args[0] == "api")
             {
-                ApiReport apiReport = ApiReport.Failure($"api {args[1]}", IssueCodes.Usage, exception.Message);
+                ApiReport apiReport = ApiReport.Failure(
+                    $"api {args[1]}",
+                    IssueCodes.Usage,
+                    exception.Message
+                );
                 apiReport.Render(json: true);
                 return apiReport.ExitCode;
             }
 
             if (args.Contains("--json"))
             {
-                RunReport report = RunReport.Failure(GuessMode(args), IssueCodes.Usage, exception.Message);
+                RunReport report = RunReport.Failure(
+                    GuessMode(args),
+                    IssueCodes.Usage,
+                    exception.Message
+                );
                 ReportRenderer.Render(report, json: true);
                 return report.ExitCode;
             }
@@ -57,7 +65,8 @@ internal static class UsageErrors
             return RunMode.Check;
         }
 
-        bool generates = !args.Contains("--source") || args.Contains("--output") || args.Contains("--language");
+        bool generates =
+            !args.Contains("--source") || args.Contains("--output") || args.Contains("--language");
         return generates ? RunMode.Generate : RunMode.Validate;
     }
 }

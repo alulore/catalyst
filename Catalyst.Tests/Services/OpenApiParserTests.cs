@@ -1,4 +1,6 @@
-﻿namespace Catalyst.Tests.Services;
+﻿using Shouldly;
+
+namespace Catalyst.Tests.Services;
 
 public class OpenApiParserTests
 {
@@ -9,9 +11,9 @@ public class OpenApiParserTests
 
         Result<OpenApiParseResult> result = OpenApiParser.Parse(json);
 
-        Assert.True(result.IsSuccess);
-        Assert.NotNull(result.Value!.Document);
-        Assert.NotNull(result.Value!.Diagnostic);
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldNotBeNull().Document.ShouldNotBeNull();
+        result.Value.ShouldNotBeNull().Diagnostic.ShouldNotBeNull();
     }
 
     [Fact]
@@ -21,8 +23,8 @@ public class OpenApiParserTests
 
         Result<OpenApiParseResult> result = OpenApiParser.Parse(json);
 
-        Assert.True(result.IsSuccess);
-        Assert.NotEmpty(result.Value!.Diagnostic.Errors);
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldNotBeNull().Diagnostic.Errors.ShouldNotBeEmpty();
     }
 
     [Fact]
@@ -30,7 +32,7 @@ public class OpenApiParserTests
     {
         Result<OpenApiParseResult> result = OpenApiParser.Parse(string.Empty);
 
-        Assert.False(result.IsSuccess);
+        result.IsSuccess.ShouldBeFalse();
     }
 
     [Theory]
@@ -40,9 +42,13 @@ public class OpenApiParserTests
     [InlineData("{\"openapi\":\"3.0.1\"}", "spec.yaml", true)]
     [InlineData("{\"openapi\":\"3.0.1\"}", "https://example.com/spec.YML?token=1", true)]
     [InlineData("openapi: 3.0.1", "spec.json", false)]
-    public void IsYaml_DetectsTheFormatFromTheExtensionThenTheContent(string content, string? sourceName, bool expected)
+    public void IsYaml_DetectsTheFormatFromTheExtensionThenTheContent(
+        string content,
+        string? sourceName,
+        bool expected
+    )
     {
-        Assert.Equal(expected, OpenApiParser.IsYaml(content, sourceName));
+        OpenApiParser.IsYaml(content, sourceName).ShouldBe(expected);
     }
 
     [Fact]
@@ -64,10 +70,10 @@ public class OpenApiParserTests
                         - $ref: '#/components/schemas/Pet'
             """;
 
-        OpenApiDocument document = OpenApiParser.Parse(yaml).Value!.Document;
+        OpenApiDocument document = OpenApiParser.Parse(yaml).Value.ShouldNotBeNull().Document;
         string code = SpecLoader.CreateGenerator(document).Generate();
 
-        Assert.Contains("pet?: Pet | null;", code);
+        code.ShouldContain("pet?: Pet | null;", Case.Sensitive);
     }
 
     [Fact]
@@ -75,8 +81,8 @@ public class OpenApiParserTests
     {
         Result<OpenApiParseResult> result = OpenApiParser.Parse("{ \"openapi\": ");
 
-        Assert.False(result.IsSuccess);
-        Assert.StartsWith("Failed to parse OpenAPI document: ", result.ErrorMessage);
-        Assert.DoesNotContain("empty result", result.ErrorMessage);
+        result.IsSuccess.ShouldBeFalse();
+        result.ErrorMessage.ShouldStartWith("Failed to parse OpenAPI document: ", Case.Sensitive);
+        result.ErrorMessage.ShouldNotContain("empty result", Case.Sensitive);
     }
 }

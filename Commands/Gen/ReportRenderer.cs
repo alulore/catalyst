@@ -1,4 +1,4 @@
-using System.Net.Http;
+using System.Globalization;
 using System.Text.Json;
 using Catalyst.Common.Models;
 using Catalyst.Common.Serialization;
@@ -27,20 +27,22 @@ internal static class ReportRenderer
     /// <summary>One JSON document on stdout, nothing else. The text goes to the console's raw writer.</summary>
     private static void WriteJson(RunReport report)
     {
-        Terminal.Out.Profile.Out.Writer.WriteLine(JsonSerializer.Serialize(report, CatalystJson.Report.RunReport));
+        Terminal.Out.Profile.Out.Writer.WriteLine(
+            JsonSerializer.Serialize(report, CatalystJson.Report.RunReport)
+        );
     }
 
     private static void WriteText(RunReport report)
     {
-        if (report.Error != null)
+        if (report.Error is { } error)
         {
-            WriteTopLevelError(report);
+            WriteTopLevelError(report, error);
             return;
         }
 
-        if (report.Mode == RunMode.Validate)
+        if (report.Mode == RunMode.Validate && report.Parsed is { } validated)
         {
-            WriteValidationSuccess(report);
+            WriteValidationSuccess(validated.Source, validated.Parsed);
             return;
         }
 
@@ -49,7 +51,9 @@ internal static class ReportRenderer
         if (!report.SingleClient && report.ConfigPath != null)
         {
             string verb = check ? "Checking" : "Generating";
-            AnsiConsole.MarkupLine($"[grey]{verb} {report.Results.Count} client(s) from[/] {Markup.Escape(report.ConfigPath)}");
+            AnsiConsole.MarkupLine(
+                $"[grey]{verb} {report.Results.Count} client(s) from[/] {Markup.Escape(report.ConfigPath)}"
+            );
         }
 
         foreach (ClientResult result in report.Results)
@@ -60,10 +64,8 @@ internal static class ReportRenderer
         WriteSummary(report, check);
     }
 
-    private static void WriteTopLevelError(RunReport report)
+    private static void WriteTopLevelError(RunReport report, Issue error)
     {
-        Issue error = report.Error!;
-
         if (error.Code == IssueCodes.Cancelled)
         {
             Terminal.WriteWarning("Cancelled.", label: false);
@@ -80,31 +82,36 @@ internal static class ReportRenderer
         }
     }
 
-    private static void WriteValidationSuccess(RunReport report)
+    private static void WriteValidationSuccess(string source, OpenApiParseResult parsed)
     {
-        (string source, OpenApiParseResult parsed) = report.Parsed!.Value;
         RenderOutput(source, parsed.Document, parsed.Diagnostic);
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]Document parsed and validated successfully.[/]");
         AnsiConsole.MarkupLine("[grey]Ready for code generation.[/]");
     }
 
+    /// <summary>A single run lists warnings before its result line; a configured run keeps each client's warnings after it.</summary>
     private static void WriteClient(ClientResult result, bool check, bool singleClient)
     {
         if (result.Failed)
         {
-            Terminal.WriteError(singleClient ? result.Error!.Message : $"{result.Name}: {result.Error!.Message}");
+            Terminal.WriteError(
+                singleClient ? result.Error.Message : $"{result.Name}: {result.Error.Message}"
+            );
             return;
         }
 
-        List<Issue> warnings = result.Warnings.Where(w => w.Code != IssueCodes.SkippedPaths).ToList();
+        List<Issue> warnings = result
+            .Warnings.Where(w => w.Code != IssueCodes.SkippedPaths)
+            .ToList();
 
         if (singleClient && result.SkippedPathCount > 0)
         {
-            AnsiConsole.MarkupLine($"[grey]Skipped {result.SkippedPathCount} path(s) matching configured skip prefixes.[/]");
+            AnsiConsole.MarkupLine(
+                $"[grey]Skipped {result.SkippedPathCount} path(s) matching configured skip prefixes.[/]"
+            );
         }
 
-        // A single run lists warnings before its result line; a configured run keeps each client's warnings after it.
         if (singleClient)
         {
             WriteWarnings(warnings);
@@ -112,11 +119,11 @@ internal static class ReportRenderer
 
         if (check)
         {
-            WriteCheckLine(result);
+            WriteCheckLine(result.Status, result.OutputPath);
         }
         else
         {
-            WriteGeneratedLine(result);
+            WriteGeneratedLine(result.Status, result.OutputPath);
         }
 
         if (!singleClient)
@@ -138,26 +145,28 @@ internal static class ReportRenderer
     /// Workbench), so it is identical whether or not the file was rewritten; an unchanged file only adds an info
     /// line after it. Plain text, never wrapped: a path split over two lines would hide it from those tools.
     /// </summary>
-    private static void WriteGeneratedLine(ClientResult result)
+    private static void WriteGeneratedLine(string status, string outputPath)
     {
-        Terminal.WriteLine(Terminal.Out, "TypeScript generated:", result.OutputPath!, AnsiColor.Green);
+        Terminal.WriteLine(Terminal.Out, "TypeScript generated:", outputPath, AnsiColor.Green);
 
-        if (result.Status == ClientStatus.Unchanged)
+        if (status == ClientStatus.Unchanged)
         {
-            AnsiConsole.MarkupLine("[grey]Unchanged since the last generation; file not rewritten.[/]");
+            AnsiConsole.MarkupLine(
+                "[grey]Unchanged since the last generation; file not rewritten.[/]"
+            );
         }
     }
 
-    private static void WriteCheckLine(ClientResult result)
+    private static void WriteCheckLine(string status, string outputPath)
     {
-        (string label, AnsiColor color) = result.Status switch
+        (string label, AnsiColor color) = status switch
         {
             ClientStatus.UpToDate => ("Up to date:", AnsiColor.Green),
             ClientStatus.Stale => ("Out of date:", AnsiColor.Yellow),
             _ => ("Missing:", AnsiColor.Yellow),
         };
 
-        Terminal.WriteLine(Terminal.Out, label, result.OutputPath!, color);
+        Terminal.WriteLine(Terminal.Out, label, outputPath, color);
     }
 
     private static void WriteSummary(RunReport report, bool check)
@@ -167,9 +176,11 @@ internal static class ReportRenderer
         if (check)
         {
             int notUpToDate = report.Results.Count(r => r.Status != ClientStatus.UpToDate);
-            AnsiConsole.MarkupLine(notUpToDate == 0
-                ? $"[green]{total} client(s) up to date.[/]"
-                : $"[yellow]{notUpToDate} of {total} client(s) out of date, missing or failed.[/]");
+            AnsiConsole.MarkupLine(
+                notUpToDate == 0
+                    ? $"[green]{total} client(s) up to date.[/]"
+                    : $"[yellow]{notUpToDate} of {total} client(s) out of date, missing or failed.[/]"
+            );
             return;
         }
 
@@ -189,12 +200,18 @@ internal static class ReportRenderer
         }
     }
 
-    private static void RenderOutput(string sourceDisplay, OpenApiDocument document, OpenApiDiagnostic diagnostic)
+    private static void RenderOutput(
+        string sourceDisplay,
+        OpenApiDocument document,
+        OpenApiDiagnostic diagnostic
+    )
     {
         AnsiConsole.Write(new Rule("[bold blue]OpenAPI Specification[/]").RuleStyle("grey"));
-        AnsiConsole.Write(new Panel(new Markup($"[bold]Source:[/] {Markup.Escape(sourceDisplay)}"))
-            .Border(BoxBorder.Rounded)
-            .BorderStyle(new Style(Color.Grey)));
+        AnsiConsole.Write(
+            new Panel(new Markup($"[bold]Source:[/] {Markup.Escape(sourceDisplay)}"))
+                .Border(BoxBorder.Rounded)
+                .BorderStyle(new Style(Color.Grey))
+        );
 
         Table infoTable = new Table()
             .Border(TableBorder.Rounded)
@@ -204,23 +221,33 @@ internal static class ReportRenderer
 
         infoTable.AddRow("Title", Markup.Escape(document.Info?.Title ?? "(none)"));
         infoTable.AddRow("Version", Markup.Escape(document.Info?.Version ?? "(none)"));
-        infoTable.AddRow("Paths", document.Paths?.Count.ToString() ?? "0");
-        infoTable.AddRow("Schemas", document.Components?.Schemas?.Count.ToString() ?? "0");
-        infoTable.AddRow("Security Schemes", document.Components?.SecuritySchemes?.Count.ToString() ?? "0");
+        infoTable.AddRow(
+            "Paths",
+            document.Paths?.Count.ToString(CultureInfo.InvariantCulture) ?? "0"
+        );
+        infoTable.AddRow(
+            "Schemas",
+            document.Components?.Schemas?.Count.ToString(CultureInfo.InvariantCulture) ?? "0"
+        );
+        infoTable.AddRow(
+            "Security Schemes",
+            document.Components?.SecuritySchemes?.Count.ToString(CultureInfo.InvariantCulture)
+                ?? "0"
+        );
 
         AnsiConsole.Write(infoTable);
 
-        if (document.Paths?.Count > 0)
+        if (document.Paths is { Count: > 0 } paths)
         {
             AnsiConsole.WriteLine();
 
             if (Console.IsOutputRedirected)
             {
-                RenderPathList(document);
+                RenderPathList(paths);
             }
             else
             {
-                RenderPathTree(document);
+                RenderPathTree(paths);
             }
         }
 
@@ -231,18 +258,23 @@ internal static class ReportRenderer
     /// One line per operation for piped output: a tree costs three lines per endpoint and is
     /// mostly indentation in a log or an output panel.
     /// </summary>
-    private static void RenderPathList(OpenApiDocument document)
+    private static void RenderPathList(OpenApiPaths paths)
     {
-        AnsiConsole.MarkupLine($"[bold]Paths ({document.Paths!.Count})[/]");
+        AnsiConsole.MarkupLine($"[bold]Paths ({paths.Count})[/]");
 
-        foreach (KeyValuePair<string, IOpenApiPathItem> path in document.Paths.OrderBy(p => p.Key))
+        foreach (KeyValuePair<string, IOpenApiPathItem> path in paths.OrderBy(p => p.Key))
         {
             if (path.Value.Operations == null)
             {
                 continue;
             }
 
-            foreach (KeyValuePair<HttpMethod, OpenApiOperation> operation in path.Value.Operations.OrderBy(o => o.Key.Method))
+            foreach (
+                KeyValuePair<
+                    HttpMethod,
+                    OpenApiOperation
+                > operation in path.Value.Operations.OrderBy(o => o.Key.Method)
+            )
             {
                 string method = operation.Key.Method.ToUpperInvariant().PadRight(6);
                 AnsiConsole.MarkupLine($"  {method} {Markup.Escape(path.Key)}");
@@ -250,18 +282,22 @@ internal static class ReportRenderer
         }
     }
 
-    private static void RenderPathTree(OpenApiDocument document)
+    private static void RenderPathTree(OpenApiPaths paths)
     {
-        Tree tree = new Tree("[bold]Paths[/]")
-            .Style(new Style(Color.Blue));
+        Tree tree = new Tree("[bold]Paths[/]").Style(new Style(Color.Blue));
 
-        foreach (KeyValuePair<string, IOpenApiPathItem> path in document.Paths!.OrderBy(p => p.Key))
+        foreach (KeyValuePair<string, IOpenApiPathItem> path in paths.OrderBy(p => p.Key))
         {
             TreeNode pathNode = tree.AddNode($"[yellow]{Markup.Escape(path.Key)}[/]");
 
             if (path.Value.Operations != null)
             {
-                foreach (KeyValuePair<HttpMethod, OpenApiOperation> operation in path.Value.Operations.OrderBy(o => o.Key.Method))
+                foreach (
+                    KeyValuePair<
+                        HttpMethod,
+                        OpenApiOperation
+                    > operation in path.Value.Operations.OrderBy(o => o.Key.Method)
+                )
                 {
                     Color methodColor = operation.Key.Method.ToUpperInvariant() switch
                     {
@@ -308,7 +344,8 @@ internal static class ReportRenderer
             diagTable.AddRow(
                 "[red]Error[/]",
                 Markup.Escape(error.Pointer ?? "N/A"),
-                Markup.Escape(error.Message));
+                Markup.Escape(error.Message)
+            );
         }
 
         foreach (OpenApiError warning in warnings)
@@ -316,12 +353,15 @@ internal static class ReportRenderer
             diagTable.AddRow(
                 "[yellow]Warning[/]",
                 Markup.Escape(warning.Pointer ?? "N/A"),
-                Markup.Escape(warning.Message));
+                Markup.Escape(warning.Message)
+            );
         }
 
-        AnsiConsole.Write(new Panel(diagTable)
-            .Header("[bold yellow]Validation Diagnostics[/]")
-            .Border(BoxBorder.Rounded)
-            .BorderColor(Color.Yellow));
+        AnsiConsole.Write(
+            new Panel(diagTable)
+                .Header("[bold yellow]Validation Diagnostics[/]")
+                .Border(BoxBorder.Rounded)
+                .BorderColor(Color.Yellow)
+        );
     }
 }

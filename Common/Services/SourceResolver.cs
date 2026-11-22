@@ -1,6 +1,6 @@
+using Auxil.Common;
 using Catalyst.Common.Enums;
 using Catalyst.Common.Models;
-using Auxil.Common;
 
 namespace Catalyst.Common.Services;
 
@@ -14,12 +14,18 @@ internal static class SourceResolver
     /// <summary>Maps a failed Resolve to its stable issue code; the messages above are produced by this class.</summary>
     public static string ClassifyFailure(string? errorMessage)
     {
-        if (errorMessage != null && errorMessage.StartsWith(FileNotFoundPrefix, StringComparison.Ordinal))
+        if (
+            errorMessage != null
+            && errorMessage.StartsWith(FileNotFoundPrefix, StringComparison.Ordinal)
+        )
         {
             return IssueCodes.SourceNotFound;
         }
 
-        if (errorMessage != null && errorMessage.StartsWith(TimeoutPrefix, StringComparison.Ordinal))
+        if (
+            errorMessage != null
+            && errorMessage.StartsWith(TimeoutPrefix, StringComparison.Ordinal)
+        )
         {
             return IssueCodes.SourceTimeout;
         }
@@ -45,20 +51,33 @@ internal static class SourceResolver
         return SourceType.FilePath;
     }
 
-    public static Task<Result<SourceResolveResult>> Resolve(string source, CancellationToken cancellationToken)
-        => Resolve(source, insecure: false, cancellationToken);
+    public static Task<Result<SourceResolveResult>> ResolveAsync(
+        string source,
+        CancellationToken cancellationToken
+    ) => ResolveAsync(source, insecure: false, cancellationToken);
 
     /// <summary>
     /// Reads the spec from a file or URL. Cancelling <paramref name="cancellationToken"/> throws an
     /// <see cref="OperationCanceledException"/>; only a real timeout is reported as an error result.
     /// </summary>
-    public static async Task<Result<SourceResolveResult>> Resolve(string source, bool insecure, CancellationToken cancellationToken, TimeSpan? timeout = null)
+    public static async Task<Result<SourceResolveResult>> ResolveAsync(
+        string source,
+        bool insecure,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null
+    )
     {
         SourceType type = DetermineSourceType(source);
 
         if (type == SourceType.Url)
         {
-            return await ResolveUrl(source, insecure, timeout ?? DefaultHttpTimeout, cancellationToken).ConfigureAwait(false);
+            return await ResolveUrlAsync(
+                    source,
+                    insecure,
+                    timeout ?? DefaultHttpTimeout,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
         }
 
         if (type == SourceType.FilePath)
@@ -69,36 +88,48 @@ internal static class SourceResolver
         return Result<SourceResolveResult>.Error($"Unrecognized source type: {source}");
     }
 
+    /// <summary>Opt-in only: with <paramref name="insecure"/> the handler skips TLS certificate validation when fetching a remote spec. Never enabled unless the caller explicitly requests it.</summary>
     internal static HttpClientHandler CreateHttpHandler(bool insecure)
     {
         HttpClientHandler handler = new();
 
         if (insecure)
         {
-            // Opt-in only: skip TLS certificate validation when fetching a remote spec.
-            // Never enabled unless the caller explicitly requests it.
-            handler.ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+#pragma warning disable MA0039 // --insecure exists to fetch specs from servers with untrusted certificates; it runs only when the user passes it
+            handler.ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator;
+#pragma warning restore MA0039
         }
 
         return handler;
     }
 
-    private static async Task<Result<SourceResolveResult>> ResolveUrl(string url, bool insecure, TimeSpan timeout, CancellationToken cancellationToken)
+    /// <summary>A cancellation the caller asked for (Ctrl+C) propagates; any other cancelled request is a timeout.</summary>
+    private static async Task<Result<SourceResolveResult>> ResolveUrlAsync(
+        string url,
+        bool insecure,
+        TimeSpan timeout,
+        CancellationToken cancellationToken
+    )
     {
         try
         {
             using HttpClientHandler handler = CreateHttpHandler(insecure);
-            using HttpClient client = new HttpClient(handler);
+            using HttpClient client = new(handler);
             client.Timeout = timeout;
             client.DefaultRequestHeaders.Add("User-Agent", "Catalyst-CLI/1.0");
-            string content = await client.GetStringAsync(url, cancellationToken).ConfigureAwait(false);
+            string content = await client
+                .GetStringAsync(url, cancellationToken)
+                .ConfigureAwait(false);
 
-            return Result<SourceResolveResult>.Ok(new SourceResolveResult
-            {
-                Content = content,
-                DisplayPath = url,
-                Type = SourceType.Url,
-            });
+            return Result<SourceResolveResult>.Ok(
+                new SourceResolveResult
+                {
+                    Content = content,
+                    DisplayPath = url,
+                    Type = SourceType.Url,
+                }
+            );
         }
         catch (HttpRequestException ex)
         {
@@ -106,16 +137,19 @@ internal static class SourceResolver
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The caller cancelled (Ctrl+C): that is not a timeout.
             throw;
         }
         catch (TaskCanceledException)
         {
-            return Result<SourceResolveResult>.Error($"{TimeoutPrefix} after {timeout.TotalSeconds:0.##} seconds.");
+            return Result<SourceResolveResult>.Error(
+                $"{TimeoutPrefix} after {timeout.TotalSeconds:0.##} seconds."
+            );
         }
         catch (Exception ex)
         {
-            return Result<SourceResolveResult>.Error($"Unexpected error while fetching URL: {ex.Message}");
+            return Result<SourceResolveResult>.Error(
+                $"Unexpected error while fetching URL: {ex.Message}"
+            );
         }
     }
 
@@ -132,12 +166,14 @@ internal static class SourceResolver
         {
             string content = File.ReadAllText(fullPath);
 
-            return Result<SourceResolveResult>.Ok(new SourceResolveResult
-            {
-                Content = content,
-                DisplayPath = fullPath,
-                Type = SourceType.FilePath,
-            });
+            return Result<SourceResolveResult>.Ok(
+                new SourceResolveResult
+                {
+                    Content = content,
+                    DisplayPath = fullPath,
+                    Type = SourceType.FilePath,
+                }
+            );
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -149,7 +185,9 @@ internal static class SourceResolver
         }
         catch (Exception ex)
         {
-            return Result<SourceResolveResult>.Error($"Unexpected error reading file: {ex.Message}");
+            return Result<SourceResolveResult>.Error(
+                $"Unexpected error reading file: {ex.Message}"
+            );
         }
     }
 }

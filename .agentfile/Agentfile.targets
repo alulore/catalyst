@@ -1,0 +1,57 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AgentfileTrimAotWarnings>IL2026;IL2046;IL2057;IL2058;IL2059;IL2060;IL2062;IL2065;IL2067;IL2070;IL2072;IL2075;IL2077;IL2080;IL2087;IL2090;IL2091;IL2092;IL2093;IL2094;IL2095;IL2096;IL2097;IL2098;IL2103;IL2104;IL2111;IL3000;IL3001;IL3002;IL3003;IL3050;IL3051;IL3053</AgentfileTrimAotWarnings>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;$(AgentfileTrimAotWarnings)</WarningsNotAsErrors>
+    <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
+    <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
+    <AgentfileProjectKind Condition="'$(IsTestProject)' == 'true' or '$(IsTestingPlatformApplication)' == 'true'">test</AgentfileProjectKind>
+    <AgentfileProjectKind Condition="'$(AgentfileProjectKind)' == '' and ('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe')">exe</AgentfileProjectKind>
+    <AgentfileProjectKind Condition="'$(AgentfileProjectKind)' == ''">library</AgentfileProjectKind>
+    <AgentfileMeziantouVersion>3.0.341</AgentfileMeziantouVersion>
+    <AgentfileThreadingVersion>18.12.1</AgentfileThreadingVersion>
+    <AgentfileAnalyzersVersion>0.20.0</AgentfileAnalyzersVersion>
+    <AgentfileAnalyzersHash>j9LswZaH4r1lDXPTMQU8kNvzcbWP49+tVAi82ziTYxLM8S77snwKN3iXSofjrVZ8Uj7X0eZkwgeg81M7SjjuUg==</AgentfileAnalyzersHash>
+    <AgentfileAnalyzersPackageVersion>$(AgentfileAnalyzersVersion)</AgentfileAnalyzersPackageVersion>
+    <AgentfileAnalyzersPackageVersion Condition="'$(AGENTFILE_NUGET_FEED)' != ''">$(AgentfileAnalyzersVersion)-dev</AgentfileAnalyzersPackageVersion>
+    <AgentfileAnalyzersFeed>$(AGENTFILE_NUGET_FEED)</AgentfileAnalyzersFeed>
+    <AgentfileAnalyzersFeed Condition="'$(AgentfileAnalyzersFeed)' == ''">https://downloads.alulore.com/nuget/v3/index.json</AgentfileAnalyzersFeed>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(AgentfileAnalyzersFeed)</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CompilerVisibleProperty Include="AgentfileProjectKind" />
+    <CompilerVisibleProperty Include="AgentfileTestedProjects" />
+    <EditorConfigFiles Include="$(AgentfileDir)agentfile.globalconfig" />
+    <EditorConfigFiles Include="$(AgentfileDir)agentfile.$(AgentfileProjectKind).globalconfig" />
+    <AdditionalFiles Include="$(AgentfileDir)CodeMetricsConfig.txt" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' != 'true'">
+    <PackageReference Include="Meziantou.Analyzer" Version="$(AgentfileMeziantouVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(AgentfileThreadingVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Agentfile.Analyzers" Version="$(AgentfileAnalyzersPackageVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' == 'true'">
+    <PackageReference Include="Meziantou.Analyzer" VersionOverride="$(AgentfileMeziantouVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" VersionOverride="$(AgentfileThreadingVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Agentfile.Analyzers" VersionOverride="$(AgentfileAnalyzersPackageVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+  </ItemGroup>
+
+  <Target Name="AgentfileTestedProjects" BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun" DependsOnTargets="ResolveReferences">
+    <PropertyGroup>
+      <AgentfileTestedProjects>@(ReferencePath->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference')->'%(Filename)', ',')</AgentfileTestedProjects>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="AgentfileVerifyAnalyzers" BeforeTargets="CoreCompile" Condition="'$(NuGetPackageRoot)' != ''">
+    <PropertyGroup>
+      <_AgentfileAnalyzersMetadata>$([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))agentfile.analyzers/$(AgentfileAnalyzersVersion.ToLowerInvariant())/.nupkg.metadata</_AgentfileAnalyzersMetadata>
+      <_AgentfileAnalyzersMetadataText Condition="Exists('$(_AgentfileAnalyzersMetadata)')">$([System.IO.File]::ReadAllText('$(_AgentfileAnalyzersMetadata)'))</_AgentfileAnalyzersMetadataText>
+    </PropertyGroup>
+    <Message Importance="high" Condition="'$(AGENTFILE_NUGET_FEED)' != ''" Text="Agentfile.Analyzers comes from AGENTFILE_NUGET_FEED ($(AGENTFILE_NUGET_FEED)); its hash is not checked." />
+    <Error Condition="'$(AGENTFILE_NUGET_FEED)' == '' and ('$(AgentfileAnalyzersHash)' == '' or !$(_AgentfileAnalyzersMetadataText.Contains('$(AgentfileAnalyzersHash)')))" Text="Agentfile.Analyzers $(AgentfileAnalyzersVersion) does not match the hash agentfile pinned, so it may have come from another package source. Map Agentfile.* to $(AgentfileAnalyzersFeed) in nuget.config, delete $([MSBuild]::EnsureTrailingSlash('$(NuGetPackageRoot)'))agentfile.analyzers, and restore again." />
+  </Target>
+</Project>

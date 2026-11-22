@@ -4,7 +4,7 @@ namespace Catalyst.Common.Services;
 internal static class GeneratedFileWriter
 {
     /// <summary>How a file on disk relates to freshly generated content.</summary>
-    public enum FileState
+    internal enum FileState
     {
         Missing,
         Different,

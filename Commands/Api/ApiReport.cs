@@ -7,18 +7,13 @@ using Catalyst.Common.Services;
 
 namespace Catalyst.Commands.Api;
 
-/// <summary>One line of <c>api list</c>.</summary>
-internal sealed record DiffSummary(int Breaking, int NonBreaking);
-
-internal sealed record ApiListItem(string Method, string Path, string? OperationId, string? Summary, bool Deprecated, List<string> Tags, string Call);
-
 /// <summary>
 /// The result of an <c>api</c> command: the envelope of the gen openapi JSON document (schemaVersion, command,
 /// success, exitCode, error) with the payload of the command. Property order is the JSON field order.
 /// </summary>
 internal sealed class ApiReport
 {
-    public int SchemaVersion => 1;
+    public int SchemaVersion { get; } = 1;
     public required string Command { get; init; }
     public bool Success { get; set; }
     public int ExitCode { get; set; }
@@ -57,9 +52,19 @@ internal sealed class ApiReport
         return this;
     }
 
-    public static ApiReport Failure(string command, string code, string message, List<string>? suggestions = null)
+    public static ApiReport Failure(
+        string command,
+        string code,
+        string message,
+        List<string>? suggestions = null
+    )
     {
-        return new ApiReport { Command = command, Error = new Issue(code, message), Suggestions = suggestions is { Count: > 0 } ? suggestions : null }.Complete();
+        return new ApiReport
+        {
+            Command = command,
+            Error = new Issue(code, message),
+            Suggestions = suggestions is { Count: > 0 } ? suggestions : null,
+        }.Complete();
     }
 
     /// <summary>The JSON document of the --json output (and of the MCP structured content).</summary>
@@ -85,7 +90,11 @@ internal sealed class ApiReport
         }
     }
 
-    private void WriteText(Action<string> write, Action<string> writeRawError, Action<string> writeError)
+    private void WriteText(
+        Action<string> write,
+        Action<string> writeRawError,
+        Action<string> writeError
+    )
     {
         if (Error != null)
         {
@@ -150,7 +159,9 @@ internal sealed class ApiReport
             return;
         }
 
-        List<ApiChange> breaking = changes.Where(c => c.Severity == ChangeSeverity.Breaking).ToList();
+        List<ApiChange> breaking = changes
+            .Where(c => c.Severity == ChangeSeverity.Breaking)
+            .ToList();
         List<ApiChange> other = changes.Where(c => c.Severity != ChangeSeverity.Breaking).ToList();
 
         if (breaking.Count > 0)
@@ -177,11 +188,12 @@ internal sealed class ApiReport
 
     private static string ChangeLine(string label, ApiChange change)
     {
-        string subject = change.Operation != null
-            ? $"{change.Operation.Method} {change.Operation.Path}  {change.Operation.Call}"
-            : $"type {change.Type}";
+        string subject =
+            change.Operation != null
+                ? $"{change.Operation.Method} {change.Operation.Path}  {change.Operation.Call}"
+                : $"type {change.Type}";
 
-        return $"{label.PadRight(8)}  {subject}: {change.Message}";
+        return $"{label, -8}  {subject}: {change.Message}";
     }
 
     private static void WriteList(List<ApiListItem> items, Action<string> write)
@@ -193,14 +205,20 @@ internal sealed class ApiReport
         foreach (ApiListItem item in items)
         {
             string deprecated = item.Deprecated ? " [deprecated]" : string.Empty;
-            string summary = string.IsNullOrWhiteSpace(item.Summary) ? string.Empty : " - " + OneLine(item.Summary, 100);
-            write($"{item.Method.PadRight(methodWidth)}  {item.Path.PadRight(pathWidth)}  {item.Call.PadRight(callWidth)}{deprecated}{summary}".TrimEnd());
+            string summary = string.IsNullOrWhiteSpace(item.Summary)
+                ? string.Empty
+                : " - " + OneLine(item.Summary, 100);
+            write(
+                $"{item.Method.PadRight(methodWidth)}  {item.Path.PadRight(pathWidth)}  {item.Call.PadRight(callWidth)}{deprecated}{summary}".TrimEnd()
+            );
         }
     }
 
     private static void WriteOperation(ApiOperation operation, Action<string> write)
     {
-        write($"{operation.Method} {operation.Path}{(operation.Deprecated ? " [deprecated]" : string.Empty)}");
+        write(
+            $"{operation.Method} {operation.Path}{(operation.Deprecated ? " [deprecated]" : string.Empty)}"
+        );
 
         if (!string.IsNullOrWhiteSpace(operation.Summary))
         {
@@ -218,39 +236,65 @@ internal sealed class ApiReport
 
         if (operation.Parameters.Count > 0)
         {
-            write(string.Empty);
-            write("Parameters:");
-
-            string[][] rows = new[] { new[] { "NAME", "WIRE", "IN", "REQUIRED", "TYPE" } }
-                .Concat(operation.Parameters.Select(p => new[] { p.Name, p.WireName, p.In, p.Required ? "required" : "optional", p.Type }))
-                .ToArray();
-            int[] widths = Enumerable.Range(0, 5).Select(column => rows.Max(row => row[column].Length)).ToArray();
-
-            for (int i = 0; i < rows.Length; i++)
-            {
-                string cells = string.Join("  ", rows[i].Select((cell, column) => cell.PadRight(widths[column])));
-                string? parameterDescription = i == 0 ? "DESCRIPTION" : operation.Parameters[i - 1].Description;
-                string description = string.IsNullOrWhiteSpace(parameterDescription) ? string.Empty : "  " + OneLine(parameterDescription, 100);
-                write(("  " + cells + description).TrimEnd());
-            }
+            WriteParameters(operation.Parameters, write);
         }
 
         write(string.Empty);
 
         if (operation.Body != null)
         {
-            string mediaType = string.IsNullOrEmpty(operation.Body.MediaType) ? string.Empty : operation.Body.MediaType + ", ";
-            write($"Body: {operation.Body.Type} ({mediaType}{(operation.Body.Required ? "required" : "optional")})");
+            string mediaType = string.IsNullOrEmpty(operation.Body.MediaType)
+                ? string.Empty
+                : operation.Body.MediaType + ", ";
+            write(
+                $"Body: {operation.Body.Type} ({mediaType}{(operation.Body.Required ? "required" : "optional")})"
+            );
         }
 
-        string responseMedia = string.IsNullOrEmpty(operation.Response.MediaType) ? string.Empty : $" ({operation.Response.MediaType})";
+        string responseMedia = string.IsNullOrEmpty(operation.Response.MediaType)
+            ? string.Empty
+            : $" ({operation.Response.MediaType})";
         write($"Response: {operation.Response.Type}{responseMedia}");
+    }
+
+    private static void WriteParameters(List<ApiParameter> parameters, Action<string> write)
+    {
+        write(string.Empty);
+        write("Parameters:");
+
+        string[][] rows = new[] { new[] { "NAME", "WIRE", "IN", "REQUIRED", "TYPE" } }
+            .Concat(
+                parameters.Select(p =>
+                    new[] { p.Name, p.WireName, p.In, p.Required ? "required" : "optional", p.Type }
+                )
+            )
+            .ToArray();
+        int[] widths = Enumerable
+            .Range(0, 5)
+            .Select(column => rows.Max(row => row[column].Length))
+            .ToArray();
+
+        for (int i = 0; i < rows.Length; i++)
+        {
+            string cells = string.Join(
+                "  ",
+                rows[i].Select((cell, column) => cell.PadRight(widths[column]))
+            );
+            string? parameterDescription = i == 0 ? "DESCRIPTION" : parameters[i - 1].Description;
+            string description = string.IsNullOrWhiteSpace(parameterDescription)
+                ? string.Empty
+                : "  " + OneLine(parameterDescription, 100);
+            write(("  " + cells + description).TrimEnd());
+        }
     }
 
     /// <summary>Collapses whitespace so descriptions stay on one line, and cuts them at a length.</summary>
     private static string OneLine(string text, int maxLength)
     {
-        string collapsed = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        string collapsed = string.Join(
+            ' ',
+            text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+        );
         return collapsed.Length <= maxLength ? collapsed : collapsed[..(maxLength - 3)] + "...";
     }
 }

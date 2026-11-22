@@ -1,0 +1,38 @@
+{
+  "kit": "agentfile",
+  "version": "0.20.0",
+  "skills": [
+    "pull-request",
+    "fix-ci",
+    "get-pr-comments",
+    "fix-merge-conflicts",
+    "explicit-state",
+    "unslop",
+    "workspace-hygiene"
+  ],
+  "files": {
+    "AGENTS.md": "5f5d75ffa5d5b105f3a267d23ec2183dd054726c62f16924cbffc5763662211c",
+    ".agentfile/Agentfile.props": "b9985afbb2cb3b8edebf15e1e72ecede1a8000f2881b7dbf39ccfaa8c35eb3b8",
+    ".agentfile/Agentfile.targets": "b9ff7592137e88e966af8daf6ec07357990fe6508b9909697e5fbe241ccf21d3",
+    ".agentfile/CodeMetricsConfig.txt": "ec6b5d6f02f461a780b81f167bd358ac6909185a914a8551700f8dfe25c388f4",
+    ".agentfile/agentfile.exe.globalconfig": "eb7ce572a0e62d0904109d2c85b76ebc692b6432332e7e510bf9f19b9367def8",
+    ".agentfile/agentfile.globalconfig": "3d250506f365a0af0c9648552932d23ea5301573da2168c96ea240b221ffcecf",
+    ".agentfile/agentfile.library.globalconfig": "63905325977712d0683173142af584b03c99c34648b05c93e32da5575e8e4ac1",
+    ".agentfile/agentfile.test.globalconfig": "fe2f7e7477fbf656c0e9185c7a1a3e288b7a2e673b3fef90ab28f2a2eea3a7a3",
+    ".claude/skills/pull-request": "f4c118cb703095e4d5fad29e79856e3aa5f1c305da24150f808097d770631fb5",
+    ".claude/skills/fix-ci": "c6fbf5f36e1664e6066e83b0465905cfea4a3f97985415372334334fc6d38572",
+    ".claude/skills/get-pr-comments": "989394d4df16bbcc2dfaa4c486bb7574777f535262943ca6bee1c0edefc4f454",
+    ".claude/skills/fix-merge-conflicts": "a6657bf563b3873959e54c8d4c03a8aae75dbad54c414244edda62437ef2b118",
+    ".claude/skills/explicit-state": "4a8421de61832481ca65c62cddf9fe9eecfba2af4771151b93607d4a09e4abcb",
+    ".claude/skills/unslop": "7aa2ff3260840e187a1c442ed1f40c44f9a84f4bd3a5c03da289da5510d8a526",
+    ".claude/skills/workspace-hygiene": "2b155ca9192b2fcdeb35140c2dd92090f801c6fb6eb1c13b43c4b4f364dc3f8e",
+    ".agents/skills/pull-request": "f4c118cb703095e4d5fad29e79856e3aa5f1c305da24150f808097d770631fb5",
+    ".agents/skills/fix-ci": "c6fbf5f36e1664e6066e83b0465905cfea4a3f97985415372334334fc6d38572",
+    ".agents/skills/get-pr-comments": "989394d4df16bbcc2dfaa4c486bb7574777f535262943ca6bee1c0edefc4f454",
+    ".agents/skills/fix-merge-conflicts": "a6657bf563b3873959e54c8d4c03a8aae75dbad54c414244edda62437ef2b118",
+    ".agents/skills/explicit-state": "4a8421de61832481ca65c62cddf9fe9eecfba2af4771151b93607d4a09e4abcb",
+    ".agents/skills/unslop": "7aa2ff3260840e187a1c442ed1f40c44f9a84f4bd3a5c03da289da5510d8a526",
+    ".agents/skills/workspace-hygiene": "2b155ca9192b2fcdeb35140c2dd92090f801c6fb6eb1c13b43c4b4f364dc3f8e"
+  },
+  "dotnetConfig": true
+}
