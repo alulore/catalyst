@@ -42,6 +42,6 @@
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
     <PackageReference Include="Spectre.Console" Version="0.55.2" />
     <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
-    <PackageReference Include="Auxil" Version="0.2.0" />
+    <PackageReference Include="Auxil" Version="0.3.0" />
   </ItemGroup>
 </Project>

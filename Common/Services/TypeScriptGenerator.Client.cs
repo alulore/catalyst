@@ -101,7 +101,7 @@ internal sealed partial class TypeScriptGenerator
                 EmitBodyEncoders(b);
 
                 b.Function("request", f =>
-                    f.Async()
+                    f.AsyncModifier()
                         .Generic("T")
                         .Parameter("path", "string")
                         .Parameter("method", "string")
@@ -367,7 +367,7 @@ internal sealed partial class TypeScriptGenerator
             m.Doc(DocText(operation.Summary));
         }
 
-        m.Async();
+        m.AsyncModifier();
 
         foreach (SignatureParameter param in BuildSignature(operation))
         {
