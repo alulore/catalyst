@@ -6,13 +6,15 @@
     <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;$(AgentfileTrimAotWarnings)</WarningsNotAsErrors>
     <ILLinkTreatWarningsAsErrors>false</ILLinkTreatWarningsAsErrors>
     <IlcTreatWarningsAsErrors>false</IlcTreatWarningsAsErrors>
+    <AgentfileReferencesTestFramework>$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('$(MSBuildProjectFullPath)')), '(?i)&lt;PackageReference\s[^&gt;]*Include\s*=\s*"(xunit|xunit\.v3[\w.]*|NUnit|MSTest[\w.]*|TUnit[\w.]*|Microsoft\.NET\.Test\.Sdk)"'))</AgentfileReferencesTestFramework>
     <AgentfileProjectKind Condition="'$(IsTestProject)' == 'true' or '$(IsTestingPlatformApplication)' == 'true'">test</AgentfileProjectKind>
     <AgentfileProjectKind Condition="'$(AgentfileProjectKind)' == '' and ('$(OutputType)' == 'Exe' or '$(OutputType)' == 'WinExe')">exe</AgentfileProjectKind>
     <AgentfileProjectKind Condition="'$(AgentfileProjectKind)' == ''">library</AgentfileProjectKind>
     <AgentfileMeziantouVersion>3.0.341</AgentfileMeziantouVersion>
     <AgentfileThreadingVersion>18.12.1</AgentfileThreadingVersion>
-    <AgentfileAnalyzersVersion>0.20.0</AgentfileAnalyzersVersion>
-    <AgentfileAnalyzersHash>j9LswZaH4r1lDXPTMQU8kNvzcbWP49+tVAi82ziTYxLM8S77snwKN3iXSofjrVZ8Uj7X0eZkwgeg81M7SjjuUg==</AgentfileAnalyzersHash>
+    <AgentfileCoverageVersion>18.12.0</AgentfileCoverageVersion>
+    <AgentfileAnalyzersVersion>0.22.0</AgentfileAnalyzersVersion>
+    <AgentfileAnalyzersHash>UynuyVMhJC61LoBDEnPqGlg0diYjaA2pyquwVyZmqbxaS0g7K3QD7l7dEDiCFvq4d3skWHUok03QD2HJeOaiyA==</AgentfileAnalyzersHash>
     <AgentfileAnalyzersPackageVersion>$(AgentfileAnalyzersVersion)</AgentfileAnalyzersPackageVersion>
     <AgentfileAnalyzersPackageVersion Condition="'$(AGENTFILE_NUGET_FEED)' != ''">$(AgentfileAnalyzersVersion)-dev</AgentfileAnalyzersPackageVersion>
     <AgentfileAnalyzersFeed>$(AGENTFILE_NUGET_FEED)</AgentfileAnalyzersFeed>
@@ -32,12 +34,14 @@
     <PackageReference Include="Meziantou.Analyzer" Version="$(AgentfileMeziantouVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" Version="$(AgentfileThreadingVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
     <PackageReference Include="Agentfile.Analyzers" Version="$(AgentfileAnalyzersPackageVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="$(AgentfileCoverageVersion)" Condition="'$(AgentfileProjectKind)' == 'test' or '$(AgentfileReferencesTestFramework)' == 'True'" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' == 'true'">
     <PackageReference Include="Meziantou.Analyzer" VersionOverride="$(AgentfileMeziantouVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
     <PackageReference Include="Microsoft.VisualStudio.Threading.Analyzers" VersionOverride="$(AgentfileThreadingVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
     <PackageReference Include="Agentfile.Analyzers" VersionOverride="$(AgentfileAnalyzersPackageVersion)" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" VersionOverride="$(AgentfileCoverageVersion)" Condition="'$(AgentfileProjectKind)' == 'test' or '$(AgentfileReferencesTestFramework)' == 'True'" />
   </ItemGroup>
 
   <Target Name="AgentfileTestedProjects" BeforeTargets="GenerateMSBuildEditorConfigFileShouldRun" DependsOnTargets="ResolveReferences">

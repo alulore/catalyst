@@ -117,4 +117,13 @@ public class TypeScriptNamingTests
     {
         TypeScriptNaming.StripHttpVerbPrefix(name, verb, pathDerived).ShouldBe(expected);
     }
+
+    [Theory]
+    [InlineData("ApiResult", true)]
+    [InlineData("class", true)]
+    [InlineData("Pet", false)]
+    public void IsReservedTypeName_IsTrueForAGeneratedTypeNameOrAKeyword(string name, bool expected)
+    {
+        TypeScriptNaming.IsReservedTypeName(name).ShouldBe(expected);
+    }
 }
