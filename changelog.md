@@ -1,5 +1,11 @@
 # catalyst changelog
 
+## 0.7.1 — 2026-11-22
+### Rebuilt on .NET 11
+The same commands and output, rebuilt on .NET 11 under stricter checks.
+~ Built with .NET 11 and Auxil 0.3.0
+~ Passes agentfile's analyzers with no suppressions beyond the opt-in `--insecure` certificate bypass; commands, options, output and MCP tools are unchanged
+
 ## 0.7.0 — 2026-11-21
 ### Native build, installed through toolkit
 Catalyst is now a native Windows executable that installs and upgrades through toolkit.
