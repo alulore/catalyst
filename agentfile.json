@@ -1,6 +1,6 @@
 {
   "kit": "agentfile",
-  "version": "0.22.0",
+  "version": "0.22.1",
   "skills": [
     "pull-request",
     "fix-ci",
@@ -11,9 +11,9 @@
     "workspace-hygiene"
   ],
   "files": {
-    "AGENTS.md": "830cfe8ee75d18e2bb93ab60ef690acff3106b389963a1447a504ad5ec0bceae",
+    "AGENTS.md": "d441eac21ec072762b0bb6c300a5ec289367a63f3cced98c8a0fd30abbefd573",
     ".agentfile/Agentfile.props": "b9985afbb2cb3b8edebf15e1e72ecede1a8000f2881b7dbf39ccfaa8c35eb3b8",
-    ".agentfile/Agentfile.targets": "fa87d2e38d8d2a1b33b1327969891318277eb13f362fe0f82abe8fe790754687",
+    ".agentfile/Agentfile.targets": "f5e97da2a9e333c34dfc4a644b75162a476bce99e70929d56075fa7c36fa3aed",
     ".agentfile/CodeMetricsConfig.txt": "ec6b5d6f02f461a780b81f167bd358ac6909185a914a8551700f8dfe25c388f4",
     ".agentfile/agentfile.exe.globalconfig": "eb7ce572a0e62d0904109d2c85b76ebc692b6432332e7e510bf9f19b9367def8",
     ".agentfile/agentfile.globalconfig": "3d250506f365a0af0c9648552932d23ea5301573da2168c96ea240b221ffcecf",
