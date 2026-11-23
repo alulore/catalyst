@@ -464,14 +464,17 @@ public class McpServerTests
         messages
             .Select(message => message["jsonrpc"].ShouldNotBeNull().GetValue<string>())
             .ShouldAllBe(version => version == "2.0");
-        messages[0]
+        Dictionary<int, JsonNode> repliesById = messages.ToDictionary(message =>
+            message["id"].ShouldNotBeNull().GetValue<int>()
+        );
+        repliesById[1]
             ["result"]
             .ShouldNotBeNull()["serverInfo"]
             .ShouldNotBeNull()["name"]
             .ShouldNotBeNull()
             .GetValue<string>()
             .ShouldBe("catalyst");
-        messages[1]
+        repliesById[2]
             ["result"]
             .ShouldNotBeNull()["tools"]
             .ShouldNotBeNull()
