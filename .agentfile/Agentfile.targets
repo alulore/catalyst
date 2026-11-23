@@ -12,8 +12,8 @@
     <AgentfileMeziantouVersion>3.0.342</AgentfileMeziantouVersion>
     <AgentfileThreadingVersion>18.12.1</AgentfileThreadingVersion>
     <AgentfileCoverageVersion>18.12.0</AgentfileCoverageVersion>
-    <AgentfileAnalyzersVersion>0.22.1</AgentfileAnalyzersVersion>
-    <AgentfileAnalyzersHash>/OPy6IF+UG55RElL6Bt277qmAPfxwzbseNn0jaU+ELZ05BvSmx/xJUJ5Uf/N4zyBfLFwYZ7VOLSGg+TIQsT+Vw==</AgentfileAnalyzersHash>
+    <AgentfileAnalyzersVersion>0.23.0</AgentfileAnalyzersVersion>
+    <AgentfileAnalyzersHash>5w7PjyLY+ATJ1zX2B0A7Tom7prQ0mpvLoblk9QmUFZNv3L1e5f9+owaAufy0vTN069aDG2yzXkQHhRp3A42y5Q==</AgentfileAnalyzersHash>
     <AgentfileAnalyzersPackageVersion>$(AgentfileAnalyzersVersion)</AgentfileAnalyzersPackageVersion>
     <AgentfileAnalyzersPackageVersion Condition="'$(AGENTFILE_NUGET_FEED)' != ''">$(AgentfileAnalyzersVersion)-dev</AgentfileAnalyzersPackageVersion>
     <AgentfileAnalyzersFeed>$(AGENTFILE_NUGET_FEED)</AgentfileAnalyzersFeed>
