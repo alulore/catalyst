@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="catalyst">
+  <title>catalyst</title>
+    <rect width="100" height="100" rx="18" fill="#171717"/>
+    <path d="M17 58L39 45L61 58L83 45" fill="none" stroke="#7d7d7d" stroke-width="6.5" stroke-linejoin="round"/>
+    <circle cx="17" cy="58" r="9.5" fill="#7d7d7d"/><circle cx="39" cy="45" r="10" fill="#dedede"/>
+    <circle cx="61" cy="58" r="11" fill="#9fe3ec"/><circle cx="83" cy="45" r="12.5" fill="#2fc4d6"/>
+</svg>
